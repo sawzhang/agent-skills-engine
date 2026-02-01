@@ -27,6 +27,7 @@ Example:
     result = await engine.execute("github", args={"action": "list-prs"})
 """
 
+from agent_skills_engine.agent import AgentConfig, AgentMessage, AgentRunner, create_agent
 from agent_skills_engine.config import SkillEntryConfig, SkillsConfig
 from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.filters import DefaultSkillFilter, SkillFilter
@@ -58,6 +59,11 @@ __all__ = [
     "SkillEntryConfig",
     # Engine
     "SkillsEngine",
+    # Agent
+    "AgentRunner",
+    "AgentConfig",
+    "AgentMessage",
+    "create_agent",
     # Loaders
     "SkillLoader",
     "MarkdownSkillLoader",
