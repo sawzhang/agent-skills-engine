@@ -162,7 +162,7 @@ class AgentRunner:
             # trust_env=False prevents reading proxy settings from environment
             http_client = httpx.AsyncClient(
                 trust_env=False,
-                timeout=httpx.Timeout(60.0, connect=10.0),
+                timeout=httpx.Timeout(300.0, connect=30.0),  # 5 min timeout for complex tasks
             )
 
             self._client = AsyncOpenAI(
