@@ -7,6 +7,7 @@ name = "agent-skills-engine"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "openai" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -32,6 +33,7 @@ openai = [
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.18" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
+    { name = "openai", specifier = ">=2.16.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
