@@ -20,7 +20,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
 from agent_skills_engine.config import SkillsConfig
+
+# Auto-load .env file from current directory or parent directories
+load_dotenv()
 from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.logging import get_logger
 from agent_skills_engine.models import Skill, SkillSnapshot

@@ -6,15 +6,14 @@ Demonstrates automatic skill loading and agent execution
 similar to Claude Code's experience.
 
 Usage:
-    # Set up environment
-    export OPENAI_BASE_URL=https://api.minimaxi.com/v1
-    export OPENAI_API_KEY=your-api-key
-
-    # Run demo
+    # Run demo (auto-loads .env file)
     python examples/agent_demo.py
 
     # Or run interactive mode
     python examples/agent_demo.py --interactive
+
+Note: The agent automatically loads .env file from the current
+directory or parent directories. No need to manually source it.
 """
 
 import asyncio
