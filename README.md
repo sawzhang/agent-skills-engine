@@ -1,39 +1,108 @@
 # Agent Skills Engine
 
-A standalone, framework-agnostic skills execution engine for LLM agents.
+A standalone, framework-agnostic skills execution engine for LLM agents. Provides a Claude Code-like experience with automatic skill discovery, loading, and execution.
 
 ## Features
 
-- **Framework Agnostic**: Works with any LLM provider (OpenAI, Anthropic, local models)
+- **Claude Code-like Experience**: `AgentRunner` provides auto-loading, slash commands, and tool execution
+- **Framework Agnostic**: Works with any LLM provider (OpenAI, Anthropic, MiniMaxi, local models)
 - **Markdown-based Skills**: Define skills as simple Markdown files with YAML frontmatter
+- **Auto-loading**: Automatically loads `.env` files and discovers skills from configured directories
+- **User-invocable Skills**: Slash commands like `/pdf`, `/pptx` for direct skill invocation
 - **Eligibility Filtering**: Automatic filtering based on OS, binaries, env vars, and config
 - **Environment Injection**: Securely inject API keys and env vars for skill execution
+- **File Watching**: Hot-reload skills when files change
 - **Multiple Sources**: Load skills from bundled, managed, workspace, and plugin directories
-- **Caching & Versioning**: Efficient skill snapshot caching with change detection
-- **CLI Tool**: Command-line interface for skill management and testing
 
 ## Installation
 
 ```bash
-# Basic installation
-pip install agent-skills-engine
-
 # With uv (recommended)
 uv add agent-skills-engine
 
-# With OpenAI adapter
+# Basic installation
+pip install agent-skills-engine
+
+# With all dependencies
 pip install agent-skills-engine[openai]
-
-# With Anthropic adapter
-pip install agent-skills-engine[anthropic]
-
-# Development
-pip install agent-skills-engine[dev]
 ```
 
 ## Quick Start
 
-### 1. Define a Skill
+### 1. Create `.env` file
+
+```bash
+# For MiniMaxi API (OpenAI-compatible)
+OPENAI_BASE_URL=https://api.minimaxi.com/v1
+OPENAI_API_KEY=your-api-key
+MINIMAX_MODEL=MiniMax-M2.1
+
+# Or for OpenAI
+OPENAI_API_KEY=your-openai-key
+```
+
+### 2. Use AgentRunner (Recommended)
+
+```python
+import asyncio
+from pathlib import Path
+from agent_skills_engine import create_agent
+
+async def main():
+    # Create agent with automatic skill loading
+    agent = await create_agent(
+        skill_dirs=[Path("./skills")],
+        system_prompt="You are a helpful assistant.",
+        watch_skills=True,  # Hot-reload on file changes
+    )
+
+    # Chat with automatic tool execution
+    response = await agent.chat("Help me create a PDF report")
+    print(response.content)
+
+    # Use slash commands
+    response = await agent.chat("/pdf extract text from invoice.pdf")
+    print(response.content)
+
+asyncio.run(main())
+```
+
+### 3. Run Interactive Mode
+
+```bash
+# Run the demo
+uv run python examples/agent_demo.py --interactive
+```
+
+Commands in interactive mode:
+- `/skills` - List all available skills
+- `/pdf`, `/pptx`, etc. - Invoke specific skills
+- `/clear` - Clear conversation history
+- `/quit` - Exit
+
+## Example Skills
+
+The `examples/skills/` directory contains ready-to-use skills:
+
+| Skill | Description | Tools |
+|-------|-------------|-------|
+| **pdf** | PDF text extraction, merging, splitting, form filling | pypdf, pdfplumber, reportlab |
+| **pptx** | PowerPoint creation and editing | python-pptx, markitdown |
+| **algorithmic-art** | Generative art with p5.js | p5.js, HTML/JS |
+| **slack-gif-creator** | Animated GIF creation for Slack | PIL/Pillow |
+| **web-artifacts-builder** | React + Tailwind + shadcn/ui apps | Node.js, Vite, pnpm |
+
+### Testing Skills
+
+```bash
+# Run all skill tests
+uv run python examples/test_skills.py
+
+# Test individual skills interactively
+uv run python examples/agent_demo.py --interactive
+```
+
+## Skill Definition Format
 
 Create `skills/my-skill/SKILL.md`:
 
@@ -47,6 +116,7 @@ metadata:
     bins: ["some-cli"]
     env: ["API_KEY"]
   primary_env: "API_KEY"
+user-invocable: true
 ---
 
 # My Skill
@@ -54,50 +124,7 @@ metadata:
 Instructions for the LLM on how to use this skill...
 ```
 
-### 2. Use the Engine
-
-```python
-from agent_skills_engine import SkillsEngine, SkillsConfig
-from pathlib import Path
-
-# Initialize
-engine = SkillsEngine(
-    config=SkillsConfig(
-        skill_dirs=[Path("./skills")],
-    )
-)
-
-# Get eligible skills
-snapshot = engine.get_snapshot()
-print(f"Loaded {len(snapshot.skills)} skills")
-
-# Get prompt for LLM
-print(snapshot.prompt)
-
-# Execute a command
-result = await engine.execute("echo 'Hello, World!'")
-print(result.output)
-```
-
-### 3. With LLM Adapters
-
-```python
-from openai import AsyncOpenAI
-from agent_skills_engine import SkillsEngine
-from agent_skills_engine.adapters import OpenAIAdapter
-
-engine = SkillsEngine(config=...)
-adapter = OpenAIAdapter(engine, AsyncOpenAI())
-
-# Skills are automatically injected into system prompt
-response = await adapter.chat([
-    Message(role="user", content="List my GitHub PRs")
-])
-```
-
-## Skill Definition Format
-
-Skills are Markdown files with YAML frontmatter:
+### Skill Metadata Options
 
 ```yaml
 ---
@@ -116,7 +143,6 @@ metadata:
     any_bins:              # At least ONE must exist
       - npm
       - pnpm
-      - yarn
     env:                   # Required environment variables
       - GITHUB_TOKEN
     os:                    # Supported platforms
@@ -125,21 +151,82 @@ metadata:
 
   primary_env: "API_KEY"   # Primary env var for API key injection
 
-  install:                 # Installation instructions
-    - kind: brew
-      id: gh
-      bins: ["gh"]
-
 user-invocable: true              # Can user invoke via /skill-name
 disable-model-invocation: false   # Hide from LLM system prompt
 ---
+```
 
-# Skill Content
+## API Reference
 
-Detailed instructions for the LLM...
+### AgentRunner
+
+```python
+from agent_skills_engine import AgentRunner, AgentConfig, create_agent
+
+# Quick creation
+agent = await create_agent(
+    skill_dirs=[Path("./skills")],
+    system_prompt="You are helpful.",
+    watch_skills=True,
+)
+
+# Or with full config
+config = AgentConfig(
+    model="MiniMax-M2.1",
+    base_url="https://api.minimaxi.com/v1",
+    api_key="...",
+    max_turns=20,
+    enable_tools=True,
+)
+agent = AgentRunner(engine, config)
+
+# Methods
+response = await agent.chat("Hello")           # Single message
+response = await agent.chat("/pdf help")       # Slash command
+async for chunk in agent.chat_stream("Hi"):    # Streaming
+    print(chunk, end="")
+await agent.run_interactive()                   # Interactive mode
+```
+
+### SkillsEngine (Low-level)
+
+```python
+from agent_skills_engine import SkillsEngine, SkillsConfig
+
+engine = SkillsEngine(
+    config=SkillsConfig(
+        skill_dirs=[Path("./skills")],
+        watch=True,
+    )
+)
+
+# Load and filter skills
+snapshot = engine.get_snapshot()
+print(f"Loaded {len(snapshot.skills)} skills")
+print(snapshot.prompt)  # For LLM system prompt
+
+# Execute commands
+result = await engine.execute("echo 'Hello'")
+print(result.output)
+
+# With environment injection
+with engine.env_context():
+    result = await engine.execute("gh pr list")
 ```
 
 ## Configuration
+
+### Environment Variables
+
+```bash
+# LLM API
+OPENAI_BASE_URL=https://api.minimaxi.com/v1
+OPENAI_API_KEY=your-key
+MINIMAX_MODEL=MiniMax-M2.1
+
+# Or standard OpenAI
+OPENAI_API_KEY=your-openai-key
+```
 
 ### YAML Config
 
@@ -147,13 +234,6 @@ Detailed instructions for the LLM...
 skill_dirs:
   - ./skills
   - ~/.agent/skills
-
-bundled_dir: /usr/share/agent/skills
-managed_dir: ~/.agent/managed-skills
-
-allow_bundled:
-  - github
-  - shell
 
 watch: true
 watch_debounce_ms: 250
@@ -165,71 +245,38 @@ entries:
     env:
       GITHUB_ORG: "my-org"
 
-  private-skill:
-    enabled: false
-
 prompt_format: xml  # xml, markdown, or json
 default_timeout_seconds: 30
-```
-
-### Programmatic Config
-
-```python
-from agent_skills_engine import SkillsConfig, SkillEntryConfig
-
-config = SkillsConfig(
-    skill_dirs=[Path("./skills")],
-    allow_bundled=["github", "shell"],
-    entries={
-        "github": SkillEntryConfig(
-            enabled=True,
-            api_key="ghp_...",
-        ),
-    },
-)
-```
-
-## CLI Usage
-
-```bash
-# List skills
-skills list -d ./skills
-
-# Show skill details
-skills show github -d ./skills
-
-# Generate prompt
-skills prompt -d ./skills -f xml
-
-# Execute command
-skills exec echo "hello"
 ```
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│              SkillsEngine               │
-├─────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  │
-│  │ Loader  │  │ Filter  │  │ Runtime │  │
-│  └────┬────┘  └────┬────┘  └────┬────┘  │
-│       │            │            │       │
-│       v            v            v       │
-│  ┌─────────────────────────────────┐   │
-│  │         SkillSnapshot           │   │
-│  │  - skills: List[Skill]          │   │
-│  │  - prompt: str                  │   │
-│  │  - version: int                 │   │
-│  └─────────────────────────────────┘   │
-└─────────────────────────────────────────┘
-                    │
-                    v
-┌─────────────────────────────────────────┐
-│            LLM Adapters                 │
-├─────────────────────────────────────────┤
-│  OpenAI  │  Anthropic  │  Custom...     │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│                 AgentRunner                      │
+│  - Auto-loads skills                            │
+│  - Injects skills into system prompt            │
+│  - Handles slash commands (/pdf, /pptx)         │
+│  - Executes tool calls automatically            │
+├─────────────────────────────────────────────────┤
+│                 SkillsEngine                     │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐         │
+│  │ Loader  │  │ Filter  │  │ Runtime │         │
+│  └────┬────┘  └────┬────┘  └────┬────┘         │
+│       │            │            │              │
+│       v            v            v              │
+│  ┌─────────────────────────────────────┐       │
+│  │          SkillSnapshot              │       │
+│  │  - skills: List[Skill]              │       │
+│  │  - prompt: str                      │       │
+│  └─────────────────────────────────────┘       │
+└─────────────────────────────────────────────────┘
+                      │
+                      v
+┌─────────────────────────────────────────────────┐
+│              LLM Providers                       │
+│  OpenAI  │  MiniMaxi  │  Anthropic  │  Custom   │
+└─────────────────────────────────────────────────┘
 ```
 
 ## Extending
@@ -255,8 +302,7 @@ from agent_skills_engine.filters import SkillFilter
 
 class TeamSkillFilter(SkillFilter):
     def filter(self, skill, config, context) -> FilterResult:
-        # Custom eligibility logic
-        if skill.metadata.tags and "team-only" in skill.metadata.tags:
+        if "team-only" in skill.metadata.tags:
             if not self.is_team_member():
                 return FilterResult(skill, False, "Team members only")
         return FilterResult(skill, True)
@@ -273,10 +319,26 @@ class DockerRuntime(SkillRuntime):
         ...
 ```
 
+## Development
+
+```bash
+# Clone and install
+git clone https://github.com/sawzhang/agent-skills-engine.git
+cd agent-skills-engine
+uv sync
+
+# Run tests
+pytest
+
+# Run skill tests
+uv run python examples/test_skills.py
+
+# Linting
+ruff check src/
+ruff format src/
+mypy src/
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
