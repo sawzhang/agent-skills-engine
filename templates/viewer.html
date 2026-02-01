@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative Art</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: white;
+            padding: 25px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #888;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 0.875rem;
+            color: #444;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+        }
+        
+        .value-display {
+            display: inline-block;
+            font-size: 0.8rem;
+            color: #667eea;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .color-picker-wrapper input[type="color"] {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .color-picker-wrapper span {
+            font-size: 0.875rem;
+            color: #666;
+        }
+        
+        .seed-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .btn-group.three-col {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #444;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .jump-input {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .jump-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+        
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            background: #e8e8e8;
+        }
+        
+        .canvas-container canvas {
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER - Replace title only -->
+    <div class="header">
+        <h1 id="art-title">Generative Art</h1>
+    </div>
+    
+    <div class="main-container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <!-- SEED SECTION - Always keep exactly as shown -->
+            <div class="section">
+                <div class="section-title">Seed</div>
+                <div class="seed-display" id="seed-display">12345</div>
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="prevSeed()">← Prev</button>
+                    <button class="btn-secondary" onclick="nextSeed()">Next →</button>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="randomSeed()">Random</button>
+                    <button class="btn-secondary" onclick="generateVariations()">Variations</button>
+                </div>
+                <div class="jump-input">
+                    <input type="number" id="seed-input" placeholder="Jump to...">
+                    <button class="btn-primary" onclick="jumpToSeed()">Go</button>
+                </div>
+            </div>
+            
+            <!-- PARAMETERS SECTION - Customize controls here -->
+            <div class="section" id="parameters-section">
+                <div class="section-title">Parameters</div>
+                <!-- PARAMETER CONTROLS WILL BE INSERTED HERE -->
+            </div>
+            
+            <!-- COLORS SECTION - Add if needed, remove if not -->
+            <div class="section" id="colors-section">
+                <div class="section-title">Colors</div>
+                <!-- COLOR CONTROLS WILL BE INSERTED HERE -->
+            </div>
+            
+            <!-- ACTIONS SECTION - Always keep exactly as shown -->
+            <div class="section">
+                <div class="section-title">Actions</div>
+                <button class="btn-primary" style="width: 100%; margin-bottom: 8px;" onclick="regenerate()">Regenerate</button>
+                <button class="btn-secondary" style="width: 100%; margin-bottom: 8px;" onclick="resetParams()">Reset</button>
+                <button class="btn-secondary" style="width: 100%;" onclick="downloadPNG()">Download PNG</button>
+            </div>
+        </div>
+        
+        <!-- CANVAS CONTAINER -->
+        <div class="canvas-container" id="canvas-container">
+            <!-- Canvas will be inserted here by p5.js -->
+        </div>
+    </div>
+    
+    <script>
+        // ========================================
+        // PARAMETERS - Customize for each artwork
+        // ========================================
+        let params = {
+            seed: 12345,
+            // Add parameters here as: name: value
+            particleCount: 500,
+            noiseScale: 0.01,
+            speed: 1.0,
+            size: 5
+        };
+        
+        // Default values for reset
+        const defaultParams = { ...params };
+        
+        // ========================================
+        // P5.JS ALGORITHM - Express the philosophy
+        // ========================================
+        
+        function setup() {
+            // Create canvas and attach to container
+            let canvas = createCanvas(1000, 1000);
+            canvas.parent('canvas-container');
+            
+            randomSeed(params.seed);
+            noiseSeed(params.seed);
+            
+            // Initialize the generative system
+            initializeSystem();
+            
+            noLoop();
+            draw();
+        }
+        
+        function draw() {
+            // Clear background
+            background(245, 245, 250);
+            
+            // YOUR ALGORITHM HERE
+            // Express the philosophy through code
+        }
+        
+        function initializeSystem() {
+            // Initialize particles, data structures, etc.
+        }
+        
+        // ========================================
+        // UI FUNCTIONS - Keep these exactly as shown
+        // ========================================
+        
+        function updateSeedDisplay() {
+            document.getElementById('seed-display').textContent = params.seed;
+            document.getElementById('seed-input').value = '';
+        }
+        
+        function prevSeed() {
+            params.seed--;
+            regenerate();
+        }
+        
+        function nextSeed() {
+            params.seed++;
+            regenerate();
+        }
+        
+        function randomSeed() {
+            params.seed = Math.floor(Math.random() * 999999);
+            regenerate();
+        }
+        
+        function jumpToSeed() {
+            let input = document.getElementById('seed-input').value;
+            if (input) {
+                params.seed = parseInt(input) || 12345;
+                regenerate();
+            }
+        }
+        
+        function generateVariations() {
+            // Generate 100 variations for exploration
+            alert('Generating variations... (Preview seeds 1-100)');
+            // This could show a gallery view in a full implementation
+        }
+        
+        function regenerate() {
+            randomSeed(params.seed);
+            noiseSeed(params.seed);
+            initializeSystem();
+            updateSeedDisplay();
+            redraw();
+        }
+        
+        function resetParams() {
+            params = { ...defaultParams };
+            // Reset all UI controls to default values
+            updateUIControls();
+            regenerate();
+        }
+        
+        function updateUIControls() {
+            // Update all slider displays to match params
+            for (let key in params) {
+                if (key !== 'seed') {
+                    let slider = document.getElementById('param-' + key);
+                    let display = document.getElementById('param-' + key + '-value');
+                    if (slider) slider.value = params[key];
+                    if (display) display.textContent = params[key];
+                }
+            }
+        }
+        
+        function updateParam(key, value) {
+            params[key] = parseFloat(value);
+            document.getElementById('param-' + key + '-value').textContent = value;
+            redraw();
+        }
+        
+        function downloadPNG() {
+            saveCanvas('generative-art', 'png');
+        }
+        
+        // ========================================
+        // INITIALIZE
+        // ========================================
+        
+        // Build parameter controls dynamically
+        document.addEventListener('DOMContentLoaded', function() {
+            let paramsSection = document.getElementById('parameters-section');
+            
+            // Remove existing parameter controls (keep section title)
+            let existingControls = paramsSection.querySelectorAll('.control-group');
+            existingControls.forEach(el => el.remove());
+            
+            // Add parameter controls
+            for (let key in params) {
+                if (key !== 'seed') {
+                    let control = document.createElement('div');
+                    control.className = 'control-group';
+                    
+                    let label = document.createElement('label');
+                    label.textContent = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+                    
+                    let slider = document.createElement('input');
+                    slider.type = 'range';
+                    slider.id = 'param-' + key;
+                    slider.min = 1;
+                    slider.max = 100;
+                    slider.step = 1;
+                    slider.value = params[key];
+                    
+                    let valueDisplay = document.createElement('span');
+                    valueDisplay.className = 'value-display';
+                    valueDisplay.id = 'param-' + key + '-value';
+                    valueDisplay.textContent = params[key];
+                    
+                    slider.oninput = function() {
+                        updateParam(key, this.value);
+                    };
+                    
+                    control.appendChild(label);
+                    control.appendChild(slider);
+                    control.appendChild(valueDisplay);
+                    paramsSection.appendChild(control);
+                }
+            }
+            
+            updateSeedDisplay();
+        });
+    </script>
+</body>
+</html>
