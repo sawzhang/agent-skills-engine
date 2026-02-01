@@ -151,15 +151,24 @@ class AgentRunner:
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
+                import httpx
             except ImportError:
                 raise ImportError(
                     "AgentRunner requires the 'openai' package. "
                     "Install with: pip install openai"
                 )
 
+            # Create httpx client without proxy to avoid SOCKS proxy issues
+            # trust_env=False prevents reading proxy settings from environment
+            http_client = httpx.AsyncClient(
+                trust_env=False,
+                timeout=httpx.Timeout(60.0, connect=10.0),
+            )
+
             self._client = AsyncOpenAI(
                 base_url=self.config.base_url,
                 api_key=self.config.api_key,
+                http_client=http_client,
             )
         return self._client
 
