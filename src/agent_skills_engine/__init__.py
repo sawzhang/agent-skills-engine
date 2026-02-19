@@ -82,11 +82,17 @@ from agent_skills_engine.extensions import (
 )
 from agent_skills_engine.filters import DefaultSkillFilter, SkillFilter
 from agent_skills_engine.model_registry import (
+    DEFAULT_THINKING_BUDGETS,
     CostBreakdown,
     ModelCost,
     ModelDefinition,
     ModelRegistry,
+    ThinkingLevel,
     TokenUsage,
+    Transport,
+    adjust_max_tokens_for_thinking,
+    map_thinking_level_to_anthropic_effort,
+    map_thinking_level_to_openai_effort,
 )
 from agent_skills_engine.loaders import MarkdownSkillLoader, SkillLoader
 from agent_skills_engine.models import (
@@ -158,6 +164,13 @@ __all__ = [
     "ModelRegistry",
     "TokenUsage",
     "CostBreakdown",
+    # Thinking & Transport
+    "ThinkingLevel",
+    "Transport",
+    "DEFAULT_THINKING_BUDGETS",
+    "adjust_max_tokens_for_thinking",
+    "map_thinking_level_to_anthropic_effort",
+    "map_thinking_level_to_openai_effort",
     # Context Management
     "ContextManager",
     "ContextCompactor",

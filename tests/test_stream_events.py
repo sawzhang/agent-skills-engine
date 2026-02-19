@@ -100,7 +100,7 @@ class TestLLMAdapterStreamEvents:
         from agent_skills_engine.engine import SkillsEngine
 
         class MockAdapter(LLMAdapter):
-            async def chat(self, messages, system_prompt=None):
+            async def chat(self, messages, system_prompt=None, **kwargs):
                 return AgentResponse(content="Hello!", tool_calls=[])
 
         config = SkillsConfig(skill_dirs=[])
@@ -125,7 +125,7 @@ class TestLLMAdapterStreamEvents:
         from agent_skills_engine.engine import SkillsEngine
 
         class MockAdapter(LLMAdapter):
-            async def chat(self, messages, system_prompt=None):
+            async def chat(self, messages, system_prompt=None, **kwargs):
                 return AgentResponse(
                     content="Let me check.",
                     tool_calls=[
@@ -163,7 +163,7 @@ class TestLLMAdapterStreamEvents:
         from agent_skills_engine.engine import SkillsEngine
 
         class MockAdapter(LLMAdapter):
-            async def chat(self, messages, system_prompt=None):
+            async def chat(self, messages, system_prompt=None, **kwargs):
                 return AgentResponse(
                     content="",
                     tool_calls=[
@@ -194,7 +194,7 @@ class TestLLMAdapterStreamEvents:
         from agent_skills_engine.engine import SkillsEngine
 
         class MockAdapter(LLMAdapter):
-            async def chat(self, messages, system_prompt=None):
+            async def chat(self, messages, system_prompt=None, **kwargs):
                 return AgentResponse(content="Hello world!", tool_calls=[])
 
         config = SkillsConfig(skill_dirs=[])

@@ -12,7 +12,7 @@ from typing import Any, TypedDict
 from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.events import StreamEvent
 from agent_skills_engine.extensions.models import ToolInfo
-from agent_skills_engine.model_registry import TokenUsage
+from agent_skills_engine.model_registry import ThinkingLevel, TokenUsage
 from agent_skills_engine.models import SkillSnapshot
 
 
@@ -178,6 +178,7 @@ class LLMAdapter(ABC):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AgentResponse:
         """
         Send a chat request to the LLM.
@@ -185,6 +186,7 @@ class LLMAdapter(ABC):
         Args:
             messages: Conversation messages
             system_prompt: Optional system prompt (skills will be appended)
+            thinking_level: Optional thinking budget level
 
         Returns:
             AgentResponse with LLM output
@@ -195,6 +197,7 @@ class LLMAdapter(ABC):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AsyncIterator[str]:
         """
         Stream a chat response from the LLM.
@@ -205,17 +208,19 @@ class LLMAdapter(ABC):
         Args:
             messages: Conversation messages
             system_prompt: Optional system prompt
+            thinking_level: Optional thinking budget level
 
         Yields:
             Response chunks
         """
-        response = await self.chat(messages, system_prompt)
+        response = await self.chat(messages, system_prompt, thinking_level=thinking_level)
         yield response.content
 
     async def chat_stream_events(
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Stream structured events from the LLM.
@@ -233,7 +238,7 @@ class LLMAdapter(ABC):
         Yields:
             StreamEvent objects
         """
-        response = await self.chat(messages, system_prompt)
+        response = await self.chat(messages, system_prompt, thinking_level=thinking_level)
 
         # Emit text
         if response.content:

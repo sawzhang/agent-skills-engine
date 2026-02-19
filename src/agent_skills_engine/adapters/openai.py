@@ -20,6 +20,11 @@ except ImportError:
 from agent_skills_engine.adapters.base import AgentResponse, LLMAdapter, Message
 from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.events import StreamEvent
+from agent_skills_engine.model_registry import (
+    ThinkingLevel,
+    Transport,
+    map_thinking_level_to_openai_effort,
+)
 
 
 class OpenAIFunction(TypedDict):
@@ -70,11 +75,15 @@ class OpenAIAdapter(LLMAdapter):
         client: AsyncOpenAI | None = None,
         model: str = "gpt-4-turbo-preview",
         enable_tools: bool = True,
+        transport: Transport = "sse",
+        session_id: str | None = None,
     ) -> None:
         super().__init__(engine)
         self.client = client or AsyncOpenAI()
         self.model = model
         self.enable_tools = enable_tools
+        self.transport = transport
+        self.session_id = session_id
 
     def _get_openai_tools(self) -> list[OpenAITool]:
         """Convert tool definitions to OpenAI format."""
@@ -91,10 +100,18 @@ class OpenAIAdapter(LLMAdapter):
             for tool in tool_defs
         ]
 
+    @staticmethod
+    def _is_reasoning_model(model: str) -> bool:
+        """Check if the model is a reasoning model (o3/o4-mini pattern)."""
+        import re
+
+        return bool(re.search(r"\bo[34]", model.lower()))
+
     async def chat(
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AgentResponse:
         """Send a chat request to OpenAI."""
         # Build system prompt with skills
@@ -130,6 +147,11 @@ class OpenAIAdapter(LLMAdapter):
             tools = self._get_openai_tools()
             if tools:
                 request_kwargs["tools"] = tools
+
+        # Add reasoning effort for reasoning models
+        level = thinking_level or "off"
+        if level != "off" and self._is_reasoning_model(self.model):
+            request_kwargs["reasoning_effort"] = map_thinking_level_to_openai_effort(level)
 
         # Call OpenAI
         response = await self.client.chat.completions.create(**request_kwargs)
@@ -177,9 +199,12 @@ class OpenAIAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AsyncIterator[str]:
         """Stream a chat response from OpenAI (text deltas only)."""
-        async for event in self.chat_stream_events(messages, system_prompt):
+        async for event in self.chat_stream_events(
+            messages, system_prompt, thinking_level=thinking_level
+        ):
             if event.type == "text_delta":
                 yield event.content
 
@@ -187,6 +212,7 @@ class OpenAIAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Stream structured events from OpenAI.
@@ -207,6 +233,11 @@ class OpenAIAdapter(LLMAdapter):
             tools = self._get_openai_tools()
             if tools:
                 request_kwargs["tools"] = tools
+
+        # Add reasoning effort for reasoning models
+        level = thinking_level or "off"
+        if level != "off" and self._is_reasoning_model(self.model):
+            request_kwargs["reasoning_effort"] = map_thinking_level_to_openai_effort(level)
 
         stream = await self.client.chat.completions.create(**request_kwargs)
 

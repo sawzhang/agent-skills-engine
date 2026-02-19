@@ -56,7 +56,13 @@ load_dotenv()
 from agent_skills_engine.adapters.registry import AdapterRegistry
 from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.logging import get_logger
-from agent_skills_engine.model_registry import ModelDefinition, ModelRegistry, TokenUsage
+from agent_skills_engine.model_registry import (
+    ModelDefinition,
+    ModelRegistry,
+    ThinkingLevel,
+    TokenUsage,
+    Transport,
+)
 from agent_skills_engine.models import Skill, SkillSnapshot
 
 logger = get_logger("agent")
@@ -98,6 +104,12 @@ class AgentConfig:
     enable_tools: bool = True  # Enable function calling
     enable_reasoning: bool = True  # Enable reasoning_split for MiniMax
     auto_execute: bool = True  # Auto-execute tool calls
+
+    # Thinking budget
+    thinking_level: ThinkingLevel | None = None  # None = off, backward compatible
+
+    # Transport
+    transport: Transport = "sse"  # Default SSE, backward compatible
 
     # Skills settings
     skill_dirs: list[Path] = field(default_factory=list)
@@ -558,7 +570,11 @@ class AgentRunner:
         if adapter is not None:
             adapter_msgs = self._convert_to_adapter_messages(messages)
             system_prompt = self.build_system_prompt()
-            response = await adapter.chat(adapter_msgs, system_prompt=system_prompt)
+            response = await adapter.chat(
+                adapter_msgs,
+                system_prompt=system_prompt,
+                thinking_level=self.config.thinking_level,
+            )
             return self._adapter_response_to_agent_message(response)
 
         formatted = self._format_messages(messages)
@@ -968,7 +984,9 @@ class AgentRunner:
             adapter_msgs = self._convert_to_adapter_messages(messages)
             system_prompt = self.build_system_prompt()
             async for event in adapter.chat_stream_events(
-                adapter_msgs, system_prompt=system_prompt,
+                adapter_msgs,
+                system_prompt=system_prompt,
+                thinking_level=self.config.thinking_level,
             ):
                 yield event
             return

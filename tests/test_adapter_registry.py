@@ -35,6 +35,7 @@ class FakeAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        **kwargs,
     ) -> AgentResponse:
         self.chat_calls.append((messages, system_prompt))
         return AgentResponse(
@@ -46,6 +47,7 @@ class FakeAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        **kwargs,
     ):
         yield StreamEvent(type="text_start")
         yield StreamEvent(type="text_delta", content=f"streamed from {self.name}")

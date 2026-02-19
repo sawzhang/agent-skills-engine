@@ -20,6 +20,13 @@ except ImportError:
 from agent_skills_engine.adapters.base import AgentResponse, LLMAdapter, Message
 from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.events import StreamEvent
+from agent_skills_engine.model_registry import (
+    ThinkingLevel,
+    TokenUsage,
+    adjust_max_tokens_for_thinking,
+    map_thinking_level_to_anthropic_effort,
+    supports_adaptive_thinking,
+)
 
 
 class AnthropicInputSchema(TypedDict):
@@ -97,6 +104,7 @@ class AnthropicAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AgentResponse:
         """Send a chat request to Anthropic."""
         # Build system prompt with skills
@@ -132,6 +140,23 @@ class AnthropicAdapter(LLMAdapter):
             if tools:
                 request_kwargs["tools"] = tools
 
+        # Add thinking configuration
+        level = thinking_level or "off"
+        if level != "off":
+            if supports_adaptive_thinking(self.model):
+                effort = map_thinking_level_to_anthropic_effort(level)
+                request_kwargs["thinking"] = {"type": "adaptive"}
+                request_kwargs["output_config"] = {"effort": effort}
+            else:
+                max_tokens, thinking_budget = adjust_max_tokens_for_thinking(
+                    self.max_tokens, 128_000, level
+                )
+                request_kwargs["max_tokens"] = max_tokens
+                request_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                }
+
         # Call Anthropic
         response = await self.client.messages.create(**request_kwargs)
 
@@ -151,6 +176,17 @@ class AnthropicAdapter(LLMAdapter):
                     }
                 )
 
+        # Extract thinking tokens from usage if available
+        thinking_tokens = 0
+        if hasattr(response.usage, "thinking_tokens"):
+            thinking_tokens = response.usage.thinking_tokens or 0
+
+        token_usage = TokenUsage(
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            thinking_tokens=thinking_tokens,
+        )
+
         return AgentResponse(
             content=content,
             tool_calls=tool_calls,
@@ -159,6 +195,7 @@ class AnthropicAdapter(LLMAdapter):
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
             },
+            token_usage=token_usage,
         )
 
     def _build_anthropic_messages(
@@ -177,9 +214,12 @@ class AnthropicAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AsyncIterator[str]:
         """Stream a chat response from Anthropic (text deltas only)."""
-        async for event in self.chat_stream_events(messages, system_prompt):
+        async for event in self.chat_stream_events(
+            messages, system_prompt, thinking_level=thinking_level
+        ):
             if event.type == "text_delta":
                 yield event.content
 
@@ -187,6 +227,7 @@ class AnthropicAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        thinking_level: ThinkingLevel | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Stream structured events from Anthropic.
@@ -218,6 +259,23 @@ class AnthropicAdapter(LLMAdapter):
             tools = self._get_anthropic_tools()
             if tools:
                 request_kwargs["tools"] = tools
+
+        # Add thinking configuration
+        level = thinking_level or "off"
+        if level != "off":
+            if supports_adaptive_thinking(self.model):
+                effort = map_thinking_level_to_anthropic_effort(level)
+                request_kwargs["thinking"] = {"type": "adaptive"}
+                request_kwargs["output_config"] = {"effort": effort}
+            else:
+                max_tokens, thinking_budget = adjust_max_tokens_for_thinking(
+                    self.max_tokens, 128_000, level
+                )
+                request_kwargs["max_tokens"] = max_tokens
+                request_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": thinking_budget,
+                }
 
         # Track current block type for mapping stop events
         # block_index -> {"type": "text"|"thinking"|"tool_use", "id": ..., "name": ...}

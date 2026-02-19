@@ -21,8 +21,29 @@ Example:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
+
+# ---------------------------------------------------------------------------
+# Thinking budget levels
+# ---------------------------------------------------------------------------
+
+ThinkingLevel = Literal["off", "minimal", "low", "medium", "high", "xhigh"]
+
+DEFAULT_THINKING_BUDGETS: dict[str, int] = {
+    "minimal": 1024,
+    "low": 2048,
+    "medium": 8192,
+    "high": 16384,
+    "xhigh": 16384,
+}
+
+# ---------------------------------------------------------------------------
+# Transport types
+# ---------------------------------------------------------------------------
+
+Transport = Literal["sse", "websocket", "auto"]
 
 
 @dataclass
@@ -43,6 +64,7 @@ class TokenUsage:
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    thinking_tokens: int = 0
 
     @property
     def total_tokens(self) -> int:
@@ -51,6 +73,7 @@ class TokenUsage:
             + self.output_tokens
             + self.cache_read_tokens
             + self.cache_write_tokens
+            + self.thinking_tokens
         )
 
     def calculate_cost(self, cost: ModelCost) -> CostBreakdown:
@@ -73,6 +96,7 @@ class TokenUsage:
             output_tokens=self.output_tokens + other.output_tokens,
             cache_read_tokens=self.cache_read_tokens + other.cache_read_tokens,
             cache_write_tokens=self.cache_write_tokens + other.cache_write_tokens,
+            thinking_tokens=self.thinking_tokens + other.thinking_tokens,
         )
 
     def __iadd__(self, other: TokenUsage) -> TokenUsage:
@@ -80,6 +104,7 @@ class TokenUsage:
         self.output_tokens += other.output_tokens
         self.cache_read_tokens += other.cache_read_tokens
         self.cache_write_tokens += other.cache_write_tokens
+        self.thinking_tokens += other.thinking_tokens
         return self
 
 
@@ -246,3 +271,78 @@ class ModelRegistry:
             self.register(model)
             count += 1
         return count
+
+
+# ---------------------------------------------------------------------------
+# Thinking budget helpers
+# ---------------------------------------------------------------------------
+
+_ADAPTIVE_PATTERN = re.compile(r"opus[_-]4[_.-]6|opus-4-6")
+
+
+def supports_adaptive_thinking(model_id: str) -> bool:
+    """Return True if the model supports adaptive thinking (effort-based).
+
+    Currently only Opus 4.6 variants support adaptive thinking.
+    """
+    return bool(_ADAPTIVE_PATTERN.search(model_id.lower()))
+
+
+def map_thinking_level_to_anthropic_effort(
+    level: ThinkingLevel,
+) -> Literal["low", "medium", "high", "max"]:
+    """Map a ThinkingLevel to Anthropic's effort parameter."""
+    mapping: dict[ThinkingLevel, Literal["low", "medium", "high", "max"]] = {
+        "off": "low",
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "max",
+    }
+    return mapping[level]
+
+
+def map_thinking_level_to_openai_effort(
+    level: ThinkingLevel,
+) -> Literal["low", "medium", "high"]:
+    """Map a ThinkingLevel to OpenAI's reasoning_effort parameter."""
+    mapping: dict[ThinkingLevel, Literal["low", "medium", "high"]] = {
+        "off": "low",
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "high",
+    }
+    return mapping[level]
+
+
+def adjust_max_tokens_for_thinking(
+    base_max_tokens: int,
+    model_max_tokens: int,
+    level: ThinkingLevel,
+    custom_budgets: dict[str, int] | None = None,
+) -> tuple[int, int]:
+    """Calculate max_tokens and thinking budget for a given thinking level.
+
+    Returns:
+        (max_tokens, thinking_budget) where max_tokens includes the thinking
+        budget and thinking_budget is the number of tokens reserved for
+        thinking. When level is "off", thinking_budget is 0 and max_tokens
+        is returned unchanged.
+    """
+    if level == "off":
+        return base_max_tokens, 0
+
+    budgets = custom_budgets if custom_budgets is not None else DEFAULT_THINKING_BUDGETS
+    thinking_budget = budgets.get(level, DEFAULT_THINKING_BUDGETS.get(level, 8192))
+
+    # max_tokens must include the thinking budget and fit within model limits
+    required = base_max_tokens + thinking_budget
+    max_tokens = min(required, model_max_tokens)
+
+    # Ensure thinking budget doesn't exceed the clamped max_tokens
+    thinking_budget = min(thinking_budget, max_tokens - 1)
+
+    return max_tokens, thinking_budget

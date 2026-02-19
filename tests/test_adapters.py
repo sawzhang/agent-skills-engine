@@ -23,6 +23,7 @@ class MockAdapter(LLMAdapter):
         self,
         messages: list[Message],
         system_prompt: str | None = None,
+        **kwargs,
     ) -> AgentResponse:
         """Record call and return mock response."""
         self.chat_calls.append((messages, system_prompt))
