@@ -63,6 +63,33 @@ class SkillRequirements:
 
 
 @dataclass
+class SkillActionParam:
+    """A parameter for a skill action."""
+
+    name: str
+    type: str = "string"  # string, file, json, number, bool
+    required: bool = False
+    position: int | None = None  # positional arg index (1-based)
+    description: str = ""
+    default: str | None = None
+
+
+@dataclass
+class SkillAction:
+    """
+    A deterministic action that can be executed without LLM.
+
+    Maps to a script file in the skill's directory that accepts CLI arguments.
+    """
+
+    name: str  # e.g. "extract-fields"
+    script: str  # relative path from skill base_dir, e.g. "scripts/extract_form_field_info.py"
+    description: str = ""
+    params: list[SkillActionParam] = field(default_factory=list)
+    output: str = "text"  # text, json, file
+
+
+@dataclass
 class SkillInvocationPolicy:
     """Controls how a skill can be invoked."""
 
@@ -105,6 +132,7 @@ class Skill:
     base_dir: Path  # Parent directory (for relative path resolution)
     source: SkillSource = SkillSource.WORKSPACE
     metadata: SkillMetadata = field(default_factory=SkillMetadata)
+    actions: dict[str, SkillAction] = field(default_factory=dict)
 
     def __hash__(self) -> int:
         return hash(self.name)
@@ -122,6 +150,15 @@ class Skill:
     def content_hash(self) -> str:
         """Generate a hash of the skill content for change detection."""
         return hashlib.sha256(self.content.encode()).hexdigest()[:16]
+
+    def get_action(self, name: str) -> SkillAction | None:
+        """Get an action by name."""
+        return self.actions.get(name)
+
+    @property
+    def has_actions(self) -> bool:
+        """Check if this skill has deterministic actions."""
+        return bool(self.actions)
 
 
 @dataclass

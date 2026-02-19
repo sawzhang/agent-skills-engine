@@ -1,20 +1,22 @@
 """
-Bash execution runtime.
+Bash execution runtime with streaming output and abort support.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Callable
 
-from agent_skills_engine.runtime.base import ExecutionResult, SkillRuntime
+from agent_skills_engine.runtime.base import ExecutionResult, OutputCallback, SkillRuntime
 
 
 class BashRuntime(SkillRuntime):
     """
     Bash-based skill execution runtime.
 
-    Executes commands using the system shell.
+    Executes commands using the system shell. Supports streaming output
+    via ``on_output`` callback and cooperative cancellation via ``abort_signal``.
     """
 
     def __init__(
@@ -33,12 +35,12 @@ class BashRuntime(SkillRuntime):
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        on_output: OutputCallback | None = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> ExecutionResult:
-        """Execute a single command."""
+        """Execute a single command with optional streaming and abort."""
         timer = self._timer()
         timeout = timeout or self.default_timeout
-
-        # Merge environment
         full_env = os.environ.copy()
         if env:
             full_env.update(env)
@@ -52,35 +54,9 @@ class BashRuntime(SkillRuntime):
                 env=full_env,
             )
 
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout,
-                )
-            except asyncio.TimeoutError:
-                process.kill()
-                await process.wait()
-                return ExecutionResult.error_result(
-                    error=f"Command timed out after {timeout}s",
-                    exit_code=-1,
-                    duration_ms=timer.elapsed_ms(),
-                )
-
-            output = self._decode_output(stdout)
-            error_output = self._decode_output(stderr)
-
-            if process.returncode == 0:
-                return ExecutionResult.success_result(
-                    output=output,
-                    duration_ms=timer.elapsed_ms(),
-                )
-            else:
-                return ExecutionResult.error_result(
-                    error=error_output or f"Command failed with exit code {process.returncode}",
-                    exit_code=process.returncode or 1,
-                    output=output,
-                    duration_ms=timer.elapsed_ms(),
-                )
+            return await self._collect_output(
+                process, timer, timeout, on_output, abort_signal, label="Command"
+            )
 
         except Exception as e:
             return ExecutionResult.error_result(
@@ -95,12 +71,12 @@ class BashRuntime(SkillRuntime):
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        on_output: OutputCallback | None = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> ExecutionResult:
-        """Execute a multi-line script."""
+        """Execute a multi-line script with optional streaming and abort."""
         timer = self._timer()
         timeout = timeout or self.default_timeout
-
-        # Merge environment
         full_env = os.environ.copy()
         if env:
             full_env.update(env)
@@ -116,40 +92,204 @@ class BashRuntime(SkillRuntime):
                 env=full_env,
             )
 
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout,
-                )
-            except asyncio.TimeoutError:
-                process.kill()
-                await process.wait()
-                return ExecutionResult.error_result(
-                    error=f"Script timed out after {timeout}s",
-                    exit_code=-1,
-                    duration_ms=timer.elapsed_ms(),
-                )
-
-            output = self._decode_output(stdout)
-            error_output = self._decode_output(stderr)
-
-            if process.returncode == 0:
-                return ExecutionResult.success_result(
-                    output=output,
-                    duration_ms=timer.elapsed_ms(),
-                )
-            else:
-                return ExecutionResult.error_result(
-                    error=error_output or f"Script failed with exit code {process.returncode}",
-                    exit_code=process.returncode or 1,
-                    output=output,
-                    duration_ms=timer.elapsed_ms(),
-                )
+            return await self._collect_output(
+                process, timer, timeout, on_output, abort_signal, label="Script"
+            )
 
         except Exception as e:
             return ExecutionResult.error_result(
                 error=str(e),
                 exit_code=-1,
+                duration_ms=timer.elapsed_ms(),
+            )
+
+    async def _collect_output(
+        self,
+        process: asyncio.subprocess.Process,
+        timer: object,
+        timeout: float,
+        on_output: OutputCallback | None,
+        abort_signal: asyncio.Event | None,
+        label: str = "Command",
+    ) -> ExecutionResult:
+        """
+        Collect output from a subprocess.
+
+        When ``on_output`` is provided, reads stdout line by line and invokes
+        the callback with each line for real-time streaming. Otherwise falls
+        back to the efficient ``communicate()`` approach.
+
+        When ``abort_signal`` is set, kills the process immediately.
+        """
+        if on_output is None and abort_signal is None:
+            # Fast path: no streaming, no abort — use communicate()
+            return await self._collect_simple(process, timer, timeout, label)
+
+        # Streaming / abort path: read stdout/stderr concurrently
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+        aborted = False
+
+        async def _read_stream(
+            stream: asyncio.StreamReader | None,
+            lines: list[str],
+            callback: OutputCallback | None,
+        ) -> None:
+            if stream is None:
+                return
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                decoded = line.decode("utf-8", errors="replace")
+                lines.append(decoded)
+                if callback:
+                    callback(decoded)
+
+        async def _watch_abort() -> None:
+            nonlocal aborted
+            if abort_signal is None:
+                return
+            await abort_signal.wait()
+            aborted = True
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+
+        try:
+            # If abort already set, kill immediately
+            if abort_signal is not None and abort_signal.is_set():
+                aborted = True
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.wait()
+                output_str = self._truncate("".join(stdout_lines))
+                return ExecutionResult.error_result(
+                    error="Aborted",
+                    exit_code=-2,
+                    output=output_str,
+                    duration_ms=timer.elapsed_ms(),
+                )
+
+            # Run readers + abort watcher concurrently with timeout
+            tasks = [
+                asyncio.create_task(_read_stream(process.stdout, stdout_lines, on_output)),
+                asyncio.create_task(_read_stream(process.stderr, stderr_lines, None)),
+            ]
+            abort_task = None
+            if abort_signal is not None:
+                abort_task = asyncio.create_task(_watch_abort())
+                tasks.append(abort_task)
+
+            done, pending = await asyncio.wait(
+                tasks,
+                timeout=timeout,
+            )
+
+            # Cancel any pending tasks
+            for t in pending:
+                t.cancel()
+                try:
+                    await t
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+            # Check if we timed out (readers didn't finish)
+            readers_done = all(
+                t.done() for t in tasks[:2]
+            )
+
+            if not readers_done and not aborted:
+                # Timeout
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.wait()
+                output_str = self._truncate("".join(stdout_lines))
+                return ExecutionResult.error_result(
+                    error=f"{label} timed out after {timeout}s",
+                    exit_code=-1,
+                    output=output_str,
+                    duration_ms=timer.elapsed_ms(),
+                )
+
+            await process.wait()
+
+            if aborted:
+                output_str = self._truncate("".join(stdout_lines))
+                return ExecutionResult.error_result(
+                    error="Aborted",
+                    exit_code=-2,
+                    output=output_str,
+                    duration_ms=timer.elapsed_ms(),
+                )
+
+            output_str = self._truncate("".join(stdout_lines))
+            error_str = "".join(stderr_lines)
+
+            if process.returncode == 0:
+                return ExecutionResult.success_result(
+                    output=output_str,
+                    duration_ms=timer.elapsed_ms(),
+                )
+            else:
+                return ExecutionResult.error_result(
+                    error=error_str or f"{label} failed with exit code {process.returncode}",
+                    exit_code=process.returncode or 1,
+                    output=output_str,
+                    duration_ms=timer.elapsed_ms(),
+                )
+
+        except Exception as e:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            return ExecutionResult.error_result(
+                error=str(e),
+                exit_code=-1,
+                duration_ms=timer.elapsed_ms(),
+            )
+
+    async def _collect_simple(
+        self,
+        process: asyncio.subprocess.Process,
+        timer: object,
+        timeout: float,
+        label: str,
+    ) -> ExecutionResult:
+        """Fast path: collect output using communicate()."""
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            return ExecutionResult.error_result(
+                error=f"{label} timed out after {timeout}s",
+                exit_code=-1,
+                duration_ms=timer.elapsed_ms(),
+            )
+
+        output = self._decode_output(stdout)
+        error_output = self._decode_output(stderr)
+
+        if process.returncode == 0:
+            return ExecutionResult.success_result(
+                output=output,
+                duration_ms=timer.elapsed_ms(),
+            )
+        else:
+            return ExecutionResult.error_result(
+                error=error_output or f"{label} failed with exit code {process.returncode}",
+                exit_code=process.returncode or 1,
+                output=output,
                 duration_ms=timer.elapsed_ms(),
             )
 
@@ -159,8 +299,10 @@ class BashRuntime(SkillRuntime):
             text = data.decode("utf-8", errors="replace")
         except Exception:
             text = str(data)
+        return self._truncate(text)
 
+    def _truncate(self, text: str) -> str:
+        """Truncate text if it exceeds max_output_size."""
         if len(text) > self.max_output_size:
-            text = text[: self.max_output_size] + "\n... (output truncated)"
-
+            return text[: self.max_output_size] + "\n... (output truncated)"
         return text

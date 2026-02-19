@@ -2,6 +2,31 @@
 name: pptx
 description: "Presentation creation, editing, and analysis. When Claude needs to work with presentations (.pptx files) for: (1) Creating new presentations, (2) Modifying or editing content, (3) Working with layouts, (4) Adding comments or speaker notes, or any other presentation tasks"
 license: Proprietary. LICENSE.txt has complete terms
+actions:
+  thumbnail:
+    script: scripts/thumbnail.py
+    description: "Create thumbnail grid from slides"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+      output_prefix: { type: string, position: 2 }
+    output: file
+  inventory:
+    script: scripts/inventory.py
+    description: "Extract structured text content from slides"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+      output_file: { type: file, required: true, position: 2 }
+    output: json
+  rearrange:
+    script: scripts/rearrange.py
+    description: "Rearrange slides by index sequence"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+  replace:
+    script: scripts/replace.py
+    description: "Apply text replacements in presentation"
+    params:
+      input_file: { type: file, required: true, position: 1 }
 ---
 
 # PPTX creation, editing, and analysis

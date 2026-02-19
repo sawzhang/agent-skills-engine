@@ -4,8 +4,10 @@ Base skill runtime interface.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -44,6 +46,10 @@ class ExecutionResult:
         )
 
 
+# Callback type for streaming tool output
+OutputCallback = Callable[[str], None]
+
+
 class SkillRuntime(ABC):
     """
     Abstract base class for skill execution runtimes.
@@ -59,6 +65,8 @@ class SkillRuntime(ABC):
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        on_output: OutputCallback | None = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> ExecutionResult:
         """
         Execute a command.
@@ -68,6 +76,10 @@ class SkillRuntime(ABC):
             cwd: Working directory
             env: Environment variables
             timeout: Execution timeout in seconds
+            on_output: Callback invoked with each line of output as it arrives.
+                       Enables streaming feedback during long-running commands.
+            abort_signal: When set, the runtime should terminate the command
+                          as soon as possible.
 
         Returns:
             ExecutionResult with output or error
@@ -81,6 +93,8 @@ class SkillRuntime(ABC):
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        on_output: OutputCallback | None = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> ExecutionResult:
         """
         Execute a multi-line script.
@@ -90,6 +104,9 @@ class SkillRuntime(ABC):
             cwd: Working directory
             env: Environment variables
             timeout: Execution timeout in seconds
+            on_output: Callback invoked with each line of output as it arrives.
+            abort_signal: When set, the runtime should terminate the script
+                          as soon as possible.
 
         Returns:
             ExecutionResult with output or error

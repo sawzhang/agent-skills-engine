@@ -19,6 +19,7 @@ from xml.sax.saxutils import escape as xml_escape
 from watchfiles import awatch
 
 from agent_skills_engine.config import SkillsConfig
+from agent_skills_engine.extensions.manager import ExtensionManager
 from agent_skills_engine.filters import DefaultSkillFilter, SkillFilter
 from agent_skills_engine.filters.base import FilterContext
 from agent_skills_engine.loaders import MarkdownSkillLoader, SkillLoader
@@ -73,6 +74,7 @@ class SkillsEngine:
 
         self._snapshot: SkillSnapshot | None = None
         self._snapshot_version = 0
+        self.extensions: ExtensionManager | None = None
 
         # File watching state
         self._watch_task: asyncio.Task[None] | None = None
@@ -310,6 +312,8 @@ class SkillsEngine:
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        on_output: Callable[[str], None] | None = None,
+        abort_signal: "asyncio.Event | None" = None,
     ) -> ExecutionResult:
         """
         Execute a command using the runtime.
@@ -319,6 +323,8 @@ class SkillsEngine:
             cwd: Working directory
             env: Additional environment variables
             timeout: Execution timeout
+            on_output: Callback for streaming output lines
+            abort_signal: Event to signal abort
 
         Returns:
             ExecutionResult with output or error
@@ -329,6 +335,8 @@ class SkillsEngine:
             cwd=cwd,
             env=env,
             timeout=timeout or self.config.default_timeout_seconds,
+            on_output=on_output,
+            abort_signal=abort_signal,
         )
         if result.success:
             logger.debug("Command succeeded (exit_code=%d)", result.exit_code)
@@ -342,6 +350,8 @@ class SkillsEngine:
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        on_output: Callable[[str], None] | None = None,
+        abort_signal: "asyncio.Event | None" = None,
     ) -> ExecutionResult:
         """
         Execute a script using the runtime.
@@ -351,6 +361,8 @@ class SkillsEngine:
             cwd: Working directory
             env: Additional environment variables
             timeout: Execution timeout
+            on_output: Callback for streaming output lines
+            abort_signal: Event to signal abort
 
         Returns:
             ExecutionResult with output or error
@@ -360,6 +372,8 @@ class SkillsEngine:
             cwd=cwd,
             env=env,
             timeout=timeout or self.config.default_timeout_seconds,
+            on_output=on_output,
+            abort_signal=abort_signal,
         )
 
     def get_skill(self, name: str) -> Skill | None:
@@ -367,9 +381,91 @@ class SkillsEngine:
         snapshot = self.get_snapshot()
         return snapshot.get_skill(name)
 
+    async def execute_action(
+        self,
+        skill_name: str,
+        action_name: str,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> ExecutionResult:
+        """
+        Execute a skill action directly, without LLM.
+
+        This is the deterministic execution path: it resolves the action's
+        script and runs it with the given arguments.
+
+        Args:
+            skill_name: Name of the skill
+            action_name: Name of the action within the skill
+            args: CLI arguments to pass to the script
+            env: Additional environment variables
+            timeout: Execution timeout
+
+        Returns:
+            ExecutionResult with output or error
+        """
+        skill = self.get_skill(skill_name)
+        if skill is None:
+            return ExecutionResult(
+                exit_code=1,
+                output="",
+                error=f"Skill not found: {skill_name}",
+                success=False,
+            )
+
+        action = skill.get_action(action_name)
+        if action is None:
+            available = ", ".join(skill.actions.keys()) if skill.actions else "none"
+            return ExecutionResult(
+                exit_code=1,
+                output="",
+                error=(
+                    f"Action '{action_name}' not found in skill "
+                    f"'{skill_name}'. Available: {available}"
+                ),
+                success=False,
+            )
+
+        # Resolve script path relative to skill's base_dir
+        script_path = skill.base_dir / action.script
+        if not script_path.exists():
+            return ExecutionResult(
+                exit_code=1,
+                output="",
+                error=f"Script not found: {script_path}",
+                success=False,
+            )
+
+        # Build command
+        cmd_parts = ["python", str(script_path)]
+        if args:
+            cmd_parts.extend(args)
+        command = " ".join(cmd_parts)
+
+        logger.debug("Executing action %s.%s: %s", skill_name, action_name, command)
+
+        return await self.execute(
+            command=command,
+            cwd=str(skill.base_dir),
+            env=env,
+            timeout=timeout,
+        )
+
     def invalidate_cache(self) -> None:
         """Invalidate the cached snapshot."""
         self._snapshot = None
+
+    def init_extensions(self) -> ExtensionManager:
+        """
+        Initialize the extension system, discover and load all extensions.
+
+        Returns:
+            The ExtensionManager instance
+        """
+        self.extensions = ExtensionManager(self)
+        self.extensions.load_all()
+        return self.extensions
 
     def _resolve_source(self, directory: Path) -> SkillSource:
         """Resolve the source type for a directory."""

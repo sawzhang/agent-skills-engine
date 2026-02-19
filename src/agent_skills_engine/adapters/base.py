@@ -10,6 +10,9 @@ from dataclasses import dataclass, field
 from typing import Any, TypedDict
 
 from agent_skills_engine.engine import SkillsEngine
+from agent_skills_engine.events import StreamEvent
+from agent_skills_engine.extensions.models import ToolInfo
+from agent_skills_engine.model_registry import TokenUsage
 from agent_skills_engine.models import SkillSnapshot
 
 
@@ -54,6 +57,7 @@ class AgentResponse:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     finish_reason: str | None = None
     usage: dict[str, int] = field(default_factory=dict)
+    token_usage: TokenUsage | None = None
 
 
 class LLMAdapter(ABC):
@@ -113,17 +117,22 @@ class LLMAdapter(ABC):
             return f"{base_prompt}\n\n{skills_prompt}"
         return skills_prompt
 
-    def get_tool_definitions(self) -> list[ToolDefinition]:
+    def get_tool_definitions(
+        self, extra_tools: list[ToolInfo] | None = None
+    ) -> list[ToolDefinition]:
         """
         Get standard tool definitions for LLM function calling.
 
         Returns a list of tools that can be used with OpenAI, Anthropic, or
         other LLM providers that support function calling.
 
+        Args:
+            extra_tools: Additional tools from extensions to include
+
         Returns:
             List of tool definitions
         """
-        return [
+        tools: list[ToolDefinition] = [
             {
                 "name": "execute",
                 "description": "Execute a single shell command and return the output.",
@@ -153,6 +162,16 @@ class LLMAdapter(ABC):
                 },
             },
         ]
+        if extra_tools:
+            for t in extra_tools:
+                tools.append(
+                    {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    }
+                )
+        return tools
 
     @abstractmethod
     async def chat(
@@ -192,6 +211,62 @@ class LLMAdapter(ABC):
         """
         response = await self.chat(messages, system_prompt)
         yield response.content
+
+    async def chat_stream_events(
+        self,
+        messages: list[Message],
+        system_prompt: str | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """
+        Stream structured events from the LLM.
+
+        Default implementation wraps ``chat()`` into a sequence of events:
+        text_start → text_delta → text_end → done.
+
+        Override in provider-specific adapters for true granular streaming
+        (separate thinking, text, and tool_call deltas).
+
+        Args:
+            messages: Conversation messages
+            system_prompt: Optional system prompt
+
+        Yields:
+            StreamEvent objects
+        """
+        response = await self.chat(messages, system_prompt)
+
+        # Emit text
+        if response.content:
+            yield StreamEvent(type="text_start")
+            yield StreamEvent(type="text_delta", content=response.content)
+            yield StreamEvent(type="text_end")
+
+        # Emit tool calls (as complete, non-streamed events)
+        for tc in response.tool_calls:
+            tc_id = tc.get("id", "")
+            tc_name = tc.get("name", "")
+            tc_args = tc.get("arguments", "")
+            if isinstance(tc_args, dict):
+                import json
+                tc_args = json.dumps(tc_args)
+            yield StreamEvent(
+                type="tool_call_start",
+                tool_call_id=tc_id,
+                tool_name=tc_name,
+            )
+            yield StreamEvent(
+                type="tool_call_delta",
+                tool_call_id=tc_id,
+                tool_name=tc_name,
+                args_delta=tc_args,
+            )
+            yield StreamEvent(
+                type="tool_call_end",
+                tool_call_id=tc_id,
+                tool_name=tc_name,
+            )
+
+        yield StreamEvent(type="done", finish_reason="complete")
 
     async def run_agent_loop(
         self,

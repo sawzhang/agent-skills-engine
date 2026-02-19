@@ -127,6 +127,46 @@ def main() -> None:
     # config path
     config_subparsers.add_parser("path", help="Show config file paths")
 
+    # Ext command with subcommands
+    ext_parser = subparsers.add_parser("ext", help="Extension management")
+    ext_subparsers = ext_parser.add_subparsers(dest="ext_command", help="Extension commands")
+
+    ext_list_parser = ext_subparsers.add_parser("list", help="List installed extensions")
+    ext_list_parser.add_argument(
+        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
+    )
+
+    ext_info_parser = ext_subparsers.add_parser("info", help="Show extension details")
+    ext_info_parser.add_argument("name", help="Extension name")
+    ext_info_parser.add_argument(
+        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
+    )
+
+    # Reload command
+    reload_parser = subparsers.add_parser("reload", help="Reload skills and extensions")
+    reload_parser.add_argument(
+        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
+    )
+
+    # Prompts command with subcommands
+    prompts_parser = subparsers.add_parser("prompts", help="Prompt template management")
+    prompts_subparsers = prompts_parser.add_subparsers(
+        dest="prompts_command", help="Prompt commands"
+    )
+
+    prompts_subparsers.add_parser("list", help="List available prompt templates")
+
+    prompts_show_parser = prompts_subparsers.add_parser("show", help="Show prompt template content")
+    prompts_show_parser.add_argument("name", help="Template name")
+
+    # Commands command
+    commands_parser = subparsers.add_parser(
+        "commands", help="List all slash commands from all sources"
+    )
+    commands_parser.add_argument(
+        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
+    )
+
     args = parser.parse_args()
 
     # Setup logging based on verbosity
@@ -147,6 +187,14 @@ def main() -> None:
         cmd_validate(args)
     elif args.command == "config":
         cmd_config(args)
+    elif args.command == "ext":
+        cmd_ext(args)
+    elif args.command == "reload":
+        cmd_reload(args)
+    elif args.command == "prompts":
+        cmd_prompts(args)
+    elif args.command == "commands":
+        cmd_commands(args)
     else:
         parser.print_help()
 
@@ -402,6 +450,197 @@ def _config_path() -> None:
     for name, path in paths:
         exists = "[green]✓[/green]" if path.exists() else "[dim]·[/dim]"
         console.print(f"  {exists} {name}: {path}")
+
+
+def cmd_ext(args: argparse.Namespace) -> None:
+    """Extension management commands."""
+    if args.ext_command == "list":
+        _ext_list(args)
+    elif args.ext_command == "info":
+        _ext_info(args)
+    else:
+        console.print("[yellow]Usage: skills ext <list|info>[/yellow]")
+
+
+def _ext_list(args: argparse.Namespace) -> None:
+    """List installed extensions."""
+    engine = _create_engine(getattr(args, "dirs", None))
+    ext_manager = engine.init_extensions()
+
+    extensions = ext_manager.get_extensions()
+    if not extensions:
+        console.print("[dim]No extensions installed.[/dim]")
+        return
+
+    table = Table(title="Installed Extensions")
+    table.add_column("Name", style="cyan")
+    table.add_column("Version")
+    table.add_column("Source", style="dim")
+    table.add_column("Commands", style="green")
+    table.add_column("Tools", style="yellow")
+
+    # Build per-extension command/tool counts
+    commands = ext_manager.get_commands()
+    tools = ext_manager.get_tools()
+
+    for ext in extensions:
+        cmd_count = sum(1 for c in commands if c.extension_name == ext.name)
+        tool_count = sum(1 for t in tools if t.extension_name == ext.name)
+        table.add_row(
+            ext.name,
+            ext.version,
+            ext.source,
+            str(cmd_count),
+            str(tool_count),
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(extensions)} extensions[/dim]")
+
+
+def _ext_info(args: argparse.Namespace) -> None:
+    """Show extension details."""
+    engine = _create_engine(getattr(args, "dirs", None))
+    ext_manager = engine.init_extensions()
+
+    ext = ext_manager.get_extension(args.name)
+    if not ext:
+        console.print(f"[red]Extension not found: {args.name}[/red]")
+        sys.exit(1)
+
+    console.print(f"\n[bold]{ext.name}[/bold] v{ext.version}")
+    if ext.description:
+        console.print(f"[dim]{ext.description}[/dim]")
+    console.print(f"  Source: {ext.source}")
+    if ext.author:
+        console.print(f"  Author: {ext.author}")
+
+    # Show registered commands
+    commands = [c for c in ext_manager.get_commands() if c.extension_name == ext.name]
+    if commands:
+        console.print("\n[bold]Commands:[/bold]")
+        for cmd in commands:
+            console.print(f"  /{cmd.name} - {cmd.description}")
+
+    # Show registered tools
+    tools = [t for t in ext_manager.get_tools() if t.extension_name == ext.name]
+    if tools:
+        console.print("\n[bold]Tools:[/bold]")
+        for tool in tools:
+            console.print(f"  {tool.name} - {tool.description}")
+
+
+def cmd_reload(args: argparse.Namespace) -> None:
+    """Reload skills and extensions."""
+    engine = _create_engine(getattr(args, "dirs", None))
+    engine.invalidate_cache()
+    snapshot = engine.get_snapshot(force_reload=True)
+    console.print(f"[green]Reloaded.[/green] {len(snapshot.skills)} skills available.")
+
+
+def cmd_prompts(args: argparse.Namespace) -> None:
+    """Prompt template management commands."""
+    if args.prompts_command == "list":
+        _prompts_list()
+    elif args.prompts_command == "show":
+        _prompts_show(args.name)
+    else:
+        console.print("[yellow]Usage: skills prompts <list|show>[/yellow]")
+
+
+def _prompts_list() -> None:
+    """List available prompt templates."""
+    from agent_skills_engine.prompts import PromptTemplateLoader
+
+    loader = PromptTemplateLoader()
+    templates = loader.load_all()
+
+    if not templates:
+        console.print("[dim]No prompt templates found.[/dim]")
+        console.print(
+            "[dim]Place .md files in ~/.agent-skills/prompts/ or ./.agent-skills/prompts/[/dim]"
+        )
+        return
+
+    table = Table(title="Prompt Templates")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description")
+    table.add_column("Variables", style="dim")
+    table.add_column("Path", style="dim")
+
+    for tmpl in templates:
+        table.add_row(
+            f"/{tmpl.name}",
+            tmpl.description[:50],
+            ", ".join(tmpl.variables) if tmpl.variables else "-",
+            str(tmpl.file_path),
+        )
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(templates)} templates[/dim]")
+
+
+def _prompts_show(name: str) -> None:
+    """Show a prompt template."""
+    from agent_skills_engine.prompts import PromptTemplateLoader
+
+    loader = PromptTemplateLoader()
+    templates = loader.load_all()
+
+    template = next((t for t in templates if t.name == name), None)
+    if not template:
+        console.print(f"[red]Template not found: {name}[/red]")
+        sys.exit(1)
+
+    console.print(f"\n[bold]/{template.name}[/bold]")
+    if template.description:
+        console.print(f"[dim]{template.description}[/dim]")
+    console.print(f"File: {template.file_path}")
+    if template.variables:
+        console.print(f"Variables: {', '.join(template.variables)}")
+    console.print("\n[bold]Content:[/bold]")
+    console.print(template.content)
+
+
+def cmd_commands(args: argparse.Namespace) -> None:
+    """List all slash commands from all sources."""
+    from agent_skills_engine.commands import CommandRegistry
+    from agent_skills_engine.prompts import PromptTemplateLoader
+
+    engine = _create_engine(getattr(args, "dirs", None))
+
+    # Initialize all command sources
+    registry = CommandRegistry(engine)
+
+    # Extensions
+    ext_manager = engine.init_extensions()
+    registry.sync_from_extensions(ext_manager)
+
+    # Skills
+    skills = engine.filter_skills()
+    registry.sync_from_skills(skills)
+
+    # Prompts
+    prompt_loader = PromptTemplateLoader()
+    templates = prompt_loader.load_all()
+    registry.sync_from_prompts(templates, prompt_loader)
+
+    # Display
+    commands = registry.list_commands()
+
+    table = Table(title="All Slash Commands")
+    table.add_column("Command", style="cyan")
+    table.add_column("Description")
+    table.add_column("Source", style="dim")
+
+    for cmd in commands:
+        # Skip quit aliases
+        if cmd.name in ("/exit", "/q"):
+            continue
+        table.add_row(cmd.name, cmd.description[:60], cmd.source)
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(commands)} commands[/dim]")
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ except ImportError:
 
 from agent_skills_engine.adapters.base import AgentResponse, LLMAdapter, Message
 from agent_skills_engine.engine import SkillsEngine
+from agent_skills_engine.events import StreamEvent
 
 
 class AnthropicInputSchema(TypedDict):
@@ -160,34 +161,130 @@ class AnthropicAdapter(LLMAdapter):
             },
         )
 
+    def _build_anthropic_messages(
+        self,
+        messages: list[Message],
+    ) -> list[dict[str, Any]]:
+        """Build Anthropic-format messages (excluding system role)."""
+        anthropic_messages: list[dict[str, Any]] = []
+        for msg in messages:
+            if msg.role == "system":
+                continue
+            anthropic_messages.append({"role": msg.role, "content": msg.content})
+        return anthropic_messages
+
     async def chat_stream(
         self,
         messages: list[Message],
         system_prompt: str | None = None,
     ) -> AsyncIterator[str]:
-        """Stream a chat response from Anthropic."""
-        # Build system prompt with skills
+        """Stream a chat response from Anthropic (text deltas only)."""
+        async for event in self.chat_stream_events(messages, system_prompt):
+            if event.type == "text_delta":
+                yield event.content
+
+    async def chat_stream_events(
+        self,
+        messages: list[Message],
+        system_prompt: str | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """
+        Stream structured events from Anthropic.
+
+        Maps Anthropic streaming events to StreamEvent types:
+        - content_block_start (text) → text_start
+        - content_block_delta (text_delta) → text_delta
+        - content_block_stop (text) → text_end
+        - content_block_start (thinking) → thinking_start
+        - content_block_delta (thinking_delta) → thinking_delta
+        - content_block_stop (thinking) → thinking_end
+        - content_block_start (tool_use) → tool_call_start
+        - content_block_delta (input_json_delta) → tool_call_delta
+        - content_block_stop (tool_use) → tool_call_end
+        """
+        import json
+
         full_system = self.build_system_prompt(system_prompt or "")
+        anthropic_messages = self._build_anthropic_messages(messages)
 
-        # Format messages for Anthropic
-        anthropic_messages: list[dict[str, Any]] = []
+        request_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "max_tokens": self.max_tokens,
+            "messages": anthropic_messages,
+        }
+        if full_system:
+            request_kwargs["system"] = full_system
+        if self.enable_tools:
+            tools = self._get_anthropic_tools()
+            if tools:
+                request_kwargs["tools"] = tools
 
-        for msg in messages:
-            if msg.role == "system":
-                continue
-            anthropic_messages.append(
-                {
-                    "role": msg.role,
-                    "content": msg.content,
-                }
-            )
+        # Track current block type for mapping stop events
+        # block_index -> {"type": "text"|"thinking"|"tool_use", "id": ..., "name": ...}
+        active_blocks: dict[int, dict[str, str]] = {}
 
-        # Stream from Anthropic
-        async with self.client.messages.stream(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            system=full_system if full_system else None,
-            messages=anthropic_messages,
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+        async with self.client.messages.stream(**request_kwargs) as stream:
+            async for event in stream:
+                event_type = event.type
+
+                if event_type == "content_block_start":
+                    block = event.content_block
+                    idx = event.index
+                    if block.type == "text":
+                        active_blocks[idx] = {"type": "text"}
+                        yield StreamEvent(type="text_start")
+                    elif block.type == "thinking":
+                        active_blocks[idx] = {"type": "thinking"}
+                        yield StreamEvent(type="thinking_start")
+                    elif block.type == "tool_use":
+                        tc_id = block.id
+                        tc_name = block.name
+                        active_blocks[idx] = {
+                            "type": "tool_use",
+                            "id": tc_id,
+                            "name": tc_name,
+                        }
+                        yield StreamEvent(
+                            type="tool_call_start",
+                            tool_call_id=tc_id,
+                            tool_name=tc_name,
+                        )
+
+                elif event_type == "content_block_delta":
+                    idx = event.index
+                    delta = event.delta
+                    block_info = active_blocks.get(idx, {})
+
+                    if delta.type == "text_delta":
+                        yield StreamEvent(type="text_delta", content=delta.text)
+                    elif delta.type == "thinking_delta":
+                        yield StreamEvent(
+                            type="thinking_delta",
+                            content=delta.thinking,
+                        )
+                    elif delta.type == "input_json_delta":
+                        yield StreamEvent(
+                            type="tool_call_delta",
+                            tool_call_id=block_info.get("id"),
+                            tool_name=block_info.get("name"),
+                            args_delta=delta.partial_json,
+                        )
+
+                elif event_type == "content_block_stop":
+                    idx = event.index
+                    block_info = active_blocks.pop(idx, {})
+                    btype = block_info.get("type", "")
+
+                    if btype == "text":
+                        yield StreamEvent(type="text_end")
+                    elif btype == "thinking":
+                        yield StreamEvent(type="thinking_end")
+                    elif btype == "tool_use":
+                        yield StreamEvent(
+                            type="tool_call_end",
+                            tool_call_id=block_info.get("id"),
+                            tool_name=block_info.get("name"),
+                        )
+
+                elif event_type == "message_stop":
+                    yield StreamEvent(type="done", finish_reason="complete")

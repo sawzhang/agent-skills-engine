@@ -34,6 +34,8 @@ from agent_skills_engine.loaders.base import SkillLoader
 from agent_skills_engine.models import (
     InstallKind,
     Skill,
+    SkillAction,
+    SkillActionParam,
     SkillEntry,
     SkillInstallSpec,
     SkillInvocationPolicy,
@@ -129,6 +131,9 @@ class MarkdownSkillLoader(SkillLoader):
         # Parse metadata
         metadata = self._parse_metadata(frontmatter)
 
+        # Parse actions
+        actions = self._parse_actions(frontmatter)
+
         skill = Skill(
             name=name,
             description=description,
@@ -137,6 +142,7 @@ class MarkdownSkillLoader(SkillLoader):
             base_dir=path.parent,
             source=source,
             metadata=metadata,
+            actions=actions,
         )
 
         return SkillEntry(
@@ -217,6 +223,47 @@ class MarkdownSkillLoader(SkillLoader):
             url=spec.get("url"),
             args=self._ensure_list(spec.get("args", [])),
         )
+
+    def _parse_actions(self, frontmatter: dict[str, Any]) -> dict[str, SkillAction]:
+        """Parse actions from frontmatter."""
+        raw_actions = frontmatter.get("actions", {})
+        if not isinstance(raw_actions, dict):
+            return {}
+
+        actions: dict[str, SkillAction] = {}
+        for action_name, action_data in raw_actions.items():
+            if not isinstance(action_data, dict):
+                continue
+            script = action_data.get("script", "")
+            if not script:
+                continue
+
+            params: list[SkillActionParam] = []
+            for param_name, param_data in action_data.get("params", {}).items():
+                if isinstance(param_data, dict):
+                    params.append(
+                        SkillActionParam(
+                            name=param_name,
+                            type=param_data.get("type", "string"),
+                            required=param_data.get("required", False),
+                            position=param_data.get("position"),
+                            description=param_data.get("description", ""),
+                            default=param_data.get("default"),
+                        )
+                    )
+                else:
+                    # Simple form: param_name: type
+                    params.append(SkillActionParam(name=param_name, type=str(param_data)))
+
+            actions[action_name] = SkillAction(
+                name=action_name,
+                script=script,
+                description=action_data.get("description", ""),
+                params=params,
+                output=action_data.get("output", "text"),
+            )
+
+        return actions
 
     @staticmethod
     def _ensure_list(value: Any) -> list[str]:

@@ -6,8 +6,9 @@ making it easy to use skills in agent workflows.
 """
 
 from agent_skills_engine.adapters.base import LLMAdapter
+from agent_skills_engine.adapters.registry import AdapterFactory, AdapterRegistry
 
-__all__ = ["LLMAdapter"]
+__all__ = ["LLMAdapter", "AdapterRegistry", "AdapterFactory"]
 
 # Optional imports for specific providers
 try:

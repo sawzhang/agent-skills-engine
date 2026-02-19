@@ -19,6 +19,7 @@ except ImportError:
 
 from agent_skills_engine.adapters.base import AgentResponse, LLMAdapter, Message
 from agent_skills_engine.engine import SkillsEngine
+from agent_skills_engine.events import StreamEvent
 
 
 class OpenAIFunction(TypedDict):
@@ -158,41 +159,120 @@ class OpenAIAdapter(LLMAdapter):
             },
         )
 
+    def _build_openai_messages(
+        self,
+        messages: list[Message],
+        system_prompt: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Build OpenAI-format messages with system prompt."""
+        full_system = self.build_system_prompt(system_prompt or "")
+        openai_messages: list[dict[str, Any]] = []
+        if full_system:
+            openai_messages.append({"role": "system", "content": full_system})
+        for msg in messages:
+            openai_messages.append({"role": msg.role, "content": msg.content})
+        return openai_messages
+
     async def chat_stream(
         self,
         messages: list[Message],
         system_prompt: str | None = None,
     ) -> AsyncIterator[str]:
-        """Stream a chat response from OpenAI."""
-        # Build system prompt with skills
-        full_system = self.build_system_prompt(system_prompt or "")
+        """Stream a chat response from OpenAI (text deltas only)."""
+        async for event in self.chat_stream_events(messages, system_prompt):
+            if event.type == "text_delta":
+                yield event.content
 
-        # Format messages for OpenAI
-        openai_messages: list[dict[str, Any]] = []
+    async def chat_stream_events(
+        self,
+        messages: list[Message],
+        system_prompt: str | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """
+        Stream structured events from OpenAI.
 
-        if full_system:
-            openai_messages.append(
-                {
-                    "role": "system",
-                    "content": full_system,
-                }
-            )
+        Maps OpenAI streaming chunks to StreamEvent types:
+        - Content deltas → text_start/text_delta/text_end
+        - Tool call deltas → tool_call_start/tool_call_delta/tool_call_end
+        """
+        openai_messages = self._build_openai_messages(messages, system_prompt)
 
-        for msg in messages:
-            openai_messages.append(
-                {
-                    "role": msg.role,
-                    "content": msg.content,
-                }
-            )
+        request_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": openai_messages,
+            "stream": True,
+        }
 
-        # Stream from OpenAI
-        stream = await self.client.chat.completions.create(
-            model=self.model,
-            messages=openai_messages,
-            stream=True,
-        )
+        if self.enable_tools:
+            tools = self._get_openai_tools()
+            if tools:
+                request_kwargs["tools"] = tools
+
+        stream = await self.client.chat.completions.create(**request_kwargs)
+
+        text_started = False
+        # Track active tool calls: index -> {id, name, args_buffer}
+        active_tool_calls: dict[int, dict[str, str]] = {}
 
         async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            if not chunk.choices:
+                continue
+
+            delta = chunk.choices[0].delta
+
+            # --- Text content ---
+            if delta.content:
+                if not text_started:
+                    yield StreamEvent(type="text_start")
+                    text_started = True
+                yield StreamEvent(type="text_delta", content=delta.content)
+
+            # --- Tool calls ---
+            if delta.tool_calls:
+                for tc_delta in delta.tool_calls:
+                    idx = tc_delta.index
+                    if idx not in active_tool_calls:
+                        # New tool call starting
+                        tc_id = tc_delta.id or ""
+                        tc_name = tc_delta.function.name if tc_delta.function and tc_delta.function.name else ""
+                        active_tool_calls[idx] = {
+                            "id": tc_id,
+                            "name": tc_name,
+                            "args": "",
+                        }
+                        # End text if it was streaming
+                        if text_started:
+                            yield StreamEvent(type="text_end")
+                            text_started = False
+                        yield StreamEvent(
+                            type="tool_call_start",
+                            tool_call_id=tc_id,
+                            tool_name=tc_name,
+                        )
+
+                    # Accumulate arguments
+                    if tc_delta.function and tc_delta.function.arguments:
+                        active_tool_calls[idx]["args"] += tc_delta.function.arguments
+                        yield StreamEvent(
+                            type="tool_call_delta",
+                            tool_call_id=active_tool_calls[idx]["id"],
+                            tool_name=active_tool_calls[idx]["name"],
+                            args_delta=tc_delta.function.arguments,
+                        )
+
+            # --- Finish ---
+            finish_reason = chunk.choices[0].finish_reason
+            if finish_reason is not None:
+                if text_started:
+                    yield StreamEvent(type="text_end")
+                    text_started = False
+
+                # Close any open tool calls
+                for idx, tc_info in active_tool_calls.items():
+                    yield StreamEvent(
+                        type="tool_call_end",
+                        tool_call_id=tc_info["id"],
+                        tool_name=tc_info["name"],
+                    )
+
+                yield StreamEvent(type="done", finish_reason=finish_reason)

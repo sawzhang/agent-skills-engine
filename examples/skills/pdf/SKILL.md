@@ -2,6 +2,42 @@
 name: pdf
 description: Comprehensive PDF manipulation toolkit for extracting text and tables, creating new PDFs, merging/splitting documents, and handling forms. When Claude needs to fill in a PDF form or programmatically process, generate, or analyze PDF documents at scale.
 license: Proprietary. LICENSE.txt has complete terms
+actions:
+  extract-fields:
+    script: scripts/extract_form_field_info.py
+    description: "Extract form field info from a PDF"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+    output: json
+  fill-form:
+    script: scripts/fill_fillable_fields.py
+    description: "Fill PDF form fields from JSON data"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+      fields_json: { type: file, required: true, position: 2 }
+      output_file: { type: file, required: true, position: 3 }
+  to-images:
+    script: scripts/convert_pdf_to_images.py
+    description: "Convert PDF pages to images"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+  check-boxes:
+    script: scripts/check_bounding_boxes.py
+    description: "Validate bounding boxes in PDF"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+      json_file: { type: file, required: true, position: 2 }
+  check-fillable:
+    script: scripts/check_fillable_fields.py
+    description: "Check if PDF has fillable form fields"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+  validate-image:
+    script: scripts/create_validation_image.py
+    description: "Create validation overlay image for PDF"
+    params:
+      input_file: { type: file, required: true, position: 1 }
+      json_file: { type: file, required: true, position: 2 }
 ---
 
 # PDF Processing Guide
