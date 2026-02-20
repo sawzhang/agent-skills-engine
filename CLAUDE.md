@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SkillKit is a framework-agnostic skills execution engine for LLM agents. It provides a plugin-based system for defining, loading, filtering, and executing skills (capabilities) that can be made available to large language models.
+SkillKit is a framework-agnostic skills execution engine for LLM agents. It provides a plugin-based system for defining, loading, filtering, and executing skills (capabilities) that can be made available to large language models. Aligned with the Claude Agent Skills architecture (progressive disclosure, on-demand loading, per-skill model/tools).
 
 ## Commands
 
@@ -44,6 +44,7 @@ Skill Files (Markdown+YAML) → [Loader] → [Filter] → [Runtime] → [Adapter
 ### Core Components
 
 - **Engine** (`engine.py`): Orchestrates the entire pipeline - loads skills from directories, applies filters, generates prompts, and executes commands
+- **Agent** (`agent.py`): `AgentRunner` with on-demand skill loading via `skill` tool, `$ARGUMENTS` substitution, `context: fork`, `!`cmd`` dynamic injection, per-skill model switching
 - **Models** (`models.py`): Data structures including `Skill`, `SkillMetadata`, `SkillRequirements`, `SkillSnapshot`
 - **Config** (`config.py`): `SkillsConfig` for directory management, filtering options, per-skill overrides
 
@@ -66,6 +67,12 @@ Skills are defined as Markdown files with YAML frontmatter, located at `skills/<
 ---
 name: skill-name
 description: What the skill does
+model: claude-sonnet-4-5-20250514    # Per-skill model override
+context: fork                  # Isolated subagent execution
+allowed-tools: [Read, Grep]   # Tool restrictions
+argument-hint: "<query>"       # Autocomplete hint
+hooks:
+  PreToolExecution: "echo pre"
 metadata:
   emoji: "🔧"
   primary_env: "API_KEY"
@@ -76,10 +83,33 @@ metadata:
     os: ["darwin", "linux"]
 ---
 # Skill content (prompt text)
+Use $ARGUMENTS for dynamic input.
+Current date: !`date +%Y-%m-%d`
 ```
+
+### On-Demand Skill Loading
+
+The system prompt only contains skill **names and descriptions** (metadata). Full skill content is loaded on-demand when the LLM calls the `skill` tool. This follows the progressive disclosure pattern from Claude Agent Skills.
+
+- `AgentConfig.skill_description_budget` (default 16000) limits total chars for skill metadata in the system prompt
+- The `skill` tool accepts `name` and optional `arguments` parameters
+- `$ARGUMENTS`, `$1`..`$N`, `${CLAUDE_SESSION_ID}` are substituted in skill content
+- `!`command`` placeholders are replaced with command stdout before sending to LLM
+- Skills with `context: fork` run in an isolated child `AgentRunner`
+- Skills with `model:` trigger per-skill model switching (restored after)
+- Skills with `allowed-tools:` restrict which tools the LLM can use
+
+### Skill Validation
+
+`AgentRunner.validate_skill(skill)` enforces:
+- Name: ≤64 chars, lowercase alphanumeric + hyphens, no leading hyphen
+- Description: non-empty, ≤1024 chars
 
 ### Key Patterns
 
+- **Progressive Disclosure**: Only skill metadata in system prompt; full content loaded on-demand via `skill` tool
 - **Environment Management**: The engine uses a context manager pattern (`env_context`) to safely backup/restore environment variables when injecting per-skill overrides
 - **Snapshot Caching**: `SkillSnapshot` provides immutable point-in-time views with version tracking and content hashing for cache invalidation
 - **Filter Short-circuiting**: Eligibility checks run in sequence and short-circuit on first failure, returning the reason for ineligibility
+- **Per-Skill Model Switching**: `switch_model()` before skill content, restore in `finally` block
+- **Fork Isolation**: `_execute_skill_forked()` creates a child `AgentRunner` with skill content as system prompt, inherits parent config

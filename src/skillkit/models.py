@@ -159,6 +159,13 @@ class Skill:
     metadata: SkillMetadata = field(default_factory=SkillMetadata)
     actions: dict[str, SkillAction] = field(default_factory=dict)
 
+    # Claude Agent Skills extensions
+    allowed_tools: list[str] = field(default_factory=list)  # Per-skill tool restrictions
+    model: str | None = None  # Per-skill model override
+    context: str | None = None  # "fork" for isolated subagent execution
+    argument_hint: str | None = None  # Autocomplete hint for slash commands
+    hooks: dict[str, str] = field(default_factory=dict)  # Per-skill lifecycle hooks
+
     def __hash__(self) -> int:
         return hash(self.name)
 

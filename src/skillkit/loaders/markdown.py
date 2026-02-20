@@ -134,6 +134,14 @@ class MarkdownSkillLoader(SkillLoader):
         # Parse actions
         actions = self._parse_actions(frontmatter)
 
+        # Parse Claude Agent Skills extensions from frontmatter
+        allowed_tools = self._ensure_list(frontmatter.get("allowed-tools", []))
+        skill_model = frontmatter.get("model")
+        context = frontmatter.get("context")
+        argument_hint = frontmatter.get("argument-hint")
+        raw_hooks = frontmatter.get("hooks")
+        hooks = raw_hooks if isinstance(raw_hooks, dict) else {}
+
         skill = Skill(
             name=name,
             description=description,
@@ -143,6 +151,11 @@ class MarkdownSkillLoader(SkillLoader):
             source=source,
             metadata=metadata,
             actions=actions,
+            allowed_tools=allowed_tools,
+            model=skill_model if isinstance(skill_model, str) else None,
+            context=context if isinstance(context, str) else None,
+            argument_hint=argument_hint if isinstance(argument_hint, str) else None,
+            hooks={str(k): str(v) for k, v in hooks.items()},
         )
 
         return SkillEntry(

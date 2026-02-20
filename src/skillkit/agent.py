@@ -52,7 +52,7 @@ from skillkit.events import (
 )
 
 # Auto-load .env file from current directory or parent directories
-load_dotenv()
+load_dotenv(override=True)
 from skillkit.adapters.registry import AdapterRegistry
 from skillkit.engine import SkillsEngine
 from skillkit.logging import get_logger
@@ -150,6 +150,9 @@ class AgentConfig:
 
     # Context files
     load_context_files: bool = True  # Auto-discover AGENTS.md / CLAUDE.md
+
+    # Skill tool settings
+    skill_description_budget: int = 16000  # Max chars for skill descriptions in system prompt
 
     @classmethod
     def from_env(cls, **overrides: Any) -> AgentConfig:
@@ -497,9 +500,13 @@ class AgentRunner:
                 f"<context-file path=\"{ctx_file.path}\">\n{ctx_file.content}\n</context-file>"
             )
 
-        # Skills prompt
+        # Skills prompt (apply description budget)
         skills_prompt = self.snapshot.prompt
         if skills_prompt:
+            budget = self.config.skill_description_budget
+            if budget > 0 and len(skills_prompt) > budget:
+                # Truncate to budget with indicator
+                skills_prompt = skills_prompt[:budget] + "\n<!-- ... truncated -->"
             parts.append(skills_prompt)
 
         # User-invocable skills hint
@@ -565,7 +572,82 @@ class AgentRunner:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "write",
+                    "description": "Write content to a file. Creates parent directories automatically. Use this instead of heredoc/cat for writing files.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "description": "The file path to write to",
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "The content to write to the file",
+                            },
+                        },
+                        "required": ["path", "content"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read",
+                    "description": "Read the contents of a file. Returns the file content as text.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "description": "The file path to read",
+                            },
+                        },
+                        "required": ["path"],
+                    },
+                },
+            },
         ]
+
+        # Add skill tool for on-demand skill loading
+        visible_skills = [
+            s for s in self.skills
+            if not s.metadata.invocation.disable_model_invocation
+        ]
+        if visible_skills:
+            skill_names = [s.name for s in visible_skills]
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": "skill",
+                    "description": (
+                        "Load and execute a skill by name. Skills provide "
+                        "specialized capabilities and detailed instructions. "
+                        "Call this when the user's request matches a skill's "
+                        "description to get the full skill content."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": (
+                                    "The skill name to invoke. Available: "
+                                    + ", ".join(skill_names)
+                                ),
+                            },
+                            "arguments": {
+                                "type": "string",
+                                "description": "Optional arguments to pass to the skill",
+                            },
+                        },
+                        "required": ["name"],
+                    },
+                },
+            })
 
         # Generate tools from skill actions
         for skill in self.skills:
@@ -882,6 +964,72 @@ class AgentRunner:
                 return result.output or "(no output)"
             return f"Error (exit {result.exit_code}): {result.error}"
 
+        if name == "write":
+            file_path = args.get("path", "")
+            content = args.get("content", "")
+            try:
+                p = Path(file_path)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(content, encoding="utf-8")
+                return f"Written {len(content)} bytes to {file_path}"
+            except Exception as e:
+                return f"Error writing file: {e}"
+
+        if name == "read":
+            file_path = args.get("path", "")
+            try:
+                p = Path(file_path)
+                if not p.exists():
+                    return f"Error: File not found: {file_path}"
+                text = p.read_text(encoding="utf-8")
+                if len(text) > 100_000:
+                    text = text[:100_000] + "\n... (truncated)"
+                return text
+            except Exception as e:
+                return f"Error reading file: {e}"
+
+        # Dispatch skill tool (on-demand loading)
+        if name == "skill":
+            skill_name = args.get("name", "")
+            arguments = args.get("arguments", "")
+            skill = self.get_skill(skill_name)
+            if skill is None:
+                available = ", ".join(s.name for s in self.skills)
+                return f"Error: Skill '{skill_name}' not found. Available: {available}"
+
+            # Per-skill model switching
+            previous_model: str | None = None
+            if skill.model and skill.model != self.config.model:
+                previous_model = self.config.model
+                self.switch_model(skill.model)
+
+            try:
+                content = skill.content
+
+                # $ARGUMENTS substitution
+                content = self._substitute_arguments(content, arguments)
+
+                # Dynamic content injection (!`command`)
+                content = await self._preprocess_dynamic_content(content)
+
+                # Context fork: run in isolated subagent
+                if skill.context == "fork":
+                    return await self._execute_skill_forked(skill, arguments)
+
+                # Prepend allowed-tools hint if restricted
+                if skill.allowed_tools:
+                    tools_hint = ", ".join(skill.allowed_tools)
+                    content = (
+                        f"[Allowed tools for this skill: {tools_hint}]\n\n"
+                        + content
+                    )
+
+                return content
+            finally:
+                # Restore model if switched
+                if previous_model is not None:
+                    self.switch_model(previous_model)
+
         # Dispatch skill action tools (format: "skill-name:action-name")
         if ":" in name:
             skill_name, action_name = name.split(":", 1)
@@ -946,6 +1094,143 @@ class AgentRunner:
         positional.sort(key=lambda t: t[0])
         return [v for _, v in positional] + extra
 
+    # ------------------------------------------------------------------
+    # Skill tool helpers (Phase 1-3)
+    # ------------------------------------------------------------------
+
+    def _substitute_arguments(self, content: str, arguments: str) -> str:
+        """Substitute $ARGUMENTS, $N, ${CLAUDE_SESSION_ID} in skill content.
+
+        Follows Claude Agent Skills spec:
+        - $ARGUMENTS → full arguments string
+        - $1, $2, ... → individual positional arguments (split on whitespace)
+        - ${CLAUDE_SESSION_ID} → current session ID
+
+        Multi-digit positional args ($10, $11, ...) are replaced before
+        single-digit ones to prevent ``$1`` from matching inside ``$10``.
+        """
+        # Replace ${CLAUDE_SESSION_ID} first (before $N which could match)
+        session_id = self.config.session_id or ""
+        content = content.replace("${CLAUDE_SESSION_ID}", session_id)
+
+        if not arguments:
+            content = content.replace("$ARGUMENTS", "")
+            content = re.sub(r"\$(\d+)", "", content)
+        else:
+            content = content.replace("$ARGUMENTS", arguments)
+            parts = arguments.split()
+            # Replace higher indices first to prevent $1 matching inside $10
+            for i in range(len(parts), 0, -1):
+                content = content.replace(f"${i}", parts[i - 1])
+            # Replace any remaining positional refs with empty
+            content = re.sub(r"\$(\d+)", "", content)
+
+        return content
+
+    async def _preprocess_dynamic_content(self, content: str) -> str:
+        """Replace !`command` with command output (dynamic context injection).
+
+        Follows Claude Agent Skills spec: shell commands wrapped in !`...`
+        are executed before skill content is sent to the LLM, and the
+        placeholder is replaced with the command's stdout.
+        """
+        pattern = re.compile(r"!`([^`]+)`")
+        matches = list(pattern.finditer(content))
+        if not matches:
+            return content
+
+        # Process in reverse order to preserve positions
+        for match in reversed(matches):
+            cmd = match.group(1)
+            try:
+                timeout = min(self.engine.config.default_timeout_seconds, 30.0)
+                result = await self.engine.execute(cmd, timeout=timeout)
+                replacement = result.output.strip() if result.success else f"[Error: {result.error}]"
+            except Exception as e:
+                logger.warning("Dynamic content injection failed for: %s — %s", cmd, e)
+                replacement = f"[Error: {e}]"
+            content = content[: match.start()] + replacement + content[match.end() :]
+
+        return content
+
+    async def _execute_skill_forked(self, skill: Skill, arguments: str) -> str:
+        """Execute skill in a forked (isolated) context.
+
+        Creates a child AgentRunner with the skill's content as system
+        prompt and runs the arguments as user input. The child has its
+        own conversation history (isolated context window).
+
+        If the skill specifies ``allowed_tools``, only those tools (plus
+        the built-in ``execute``/``execute_script``) are available to the
+        child agent.
+        """
+        child_config = AgentConfig(
+            model=skill.model or self.config.model,
+            base_url=self.config.base_url,
+            api_key=self.config.api_key,
+            temperature=self.config.temperature,
+            max_tokens=self.config.max_tokens,
+            max_turns=self.config.max_turns,
+            enable_tools=True,
+            enable_reasoning=self.config.enable_reasoning,
+            thinking_level=self.config.thinking_level,
+            transport=self.config.transport,
+            system_prompt=skill.content,
+            skill_dirs=list(self.config.skill_dirs),
+            load_context_files=False,  # Don't inherit context files
+            cache_retention=self.config.cache_retention,
+            session_id=self.config.session_id,
+            skill_description_budget=self.config.skill_description_budget,
+        )
+        child = AgentRunner(self.engine, child_config)
+
+        # Inherit adapter registry
+        child.adapter_registry = self.adapter_registry
+        child._active_adapter_name = self._active_adapter_name
+
+        # Enforce allowed_tools by wrapping get_tools
+        if skill.allowed_tools:
+            allowed = set(skill.allowed_tools)
+            original_get_tools = child.get_tools
+
+            def _filtered_get_tools() -> list[dict[str, Any]]:
+                all_tools = original_get_tools()
+                return [
+                    t for t in all_tools
+                    if t["function"]["name"] in allowed
+                ]
+
+            child.get_tools = _filtered_get_tools  # type: ignore[assignment]
+
+        user_msg = arguments or "Execute this skill."
+        response = await child.chat(user_msg)
+        return response.text_content
+
+    @staticmethod
+    def validate_skill(skill: Skill) -> list[str]:
+        """Validate skill name and description per Claude Agent Skills spec.
+
+        Rules:
+        - name: ≤64 chars, lowercase alphanumeric + hyphens, no leading hyphen
+        - description: non-empty, ≤1024 chars
+
+        Returns list of validation error strings (empty if valid).
+        """
+        errors: list[str] = []
+        if len(skill.name) > 64:
+            errors.append(f"Name too long ({len(skill.name)} > 64 chars)")
+        if not re.match(r"^[a-z0-9][a-z0-9-]*$", skill.name):
+            errors.append(
+                f"Name must be lowercase alphanumeric with hyphens: '{skill.name}'"
+            )
+        if not skill.description:
+            errors.append("Description is required")
+        elif len(skill.description) > 1024:
+            errors.append(
+                f"Description too long ({len(skill.description)} > 1024 chars)"
+            )
+        return errors
+
     def _check_skill_invocation(self, user_input: str) -> Skill | None:
         """Check if user input is a skill invocation (e.g., /pdf)."""
         match = re.match(r"^/(\S+)", user_input.strip())
@@ -994,10 +1279,23 @@ class AgentRunner:
         # Check for skill invocation
         invoked_skill = self._check_skill_invocation(user_input)
         if invoked_skill:
+            # Extract arguments after /skill-name
+            skill_args = user_input.strip().split(None, 1)
+            arguments = skill_args[1] if len(skill_args) > 1 else ""
+
+            # Handle context: fork — run in isolated subagent
+            if invoked_skill.context == "fork":
+                fork_result = await self._execute_skill_forked(invoked_skill, arguments)
+                return AgentMessage(role="assistant", content=fork_result)
+
+            # Apply $ARGUMENTS and dynamic content
+            skill_content = self._substitute_arguments(invoked_skill.content, arguments)
+            skill_content = await self._preprocess_dynamic_content(skill_content)
+
             skill_context = (
                 f"[User invoked skill: /{invoked_skill.name}]\n\n"
                 f"<skill-content name=\"{invoked_skill.name}\">\n"
-                f"{invoked_skill.content}\n"
+                f"{skill_content}\n"
                 f"</skill-content>\n\n"
                 f"User input: {user_input}"
             )
@@ -1396,10 +1694,27 @@ class AgentRunner:
         # Check for skill invocation
         invoked_skill = self._check_skill_invocation(user_input)
         if invoked_skill:
+            # Extract arguments after /skill-name
+            skill_args = user_input.strip().split(None, 1)
+            arguments = skill_args[1] if len(skill_args) > 1 else ""
+
+            # Handle context: fork — run in isolated subagent
+            if invoked_skill.context == "fork":
+                fork_result = await self._execute_skill_forked(invoked_skill, arguments)
+                yield StreamEvent(type="text_start")
+                yield StreamEvent(type="text_delta", content=fork_result)
+                yield StreamEvent(type="text_end")
+                yield StreamEvent(type="done", finish_reason="complete")
+                return
+
+            # Apply $ARGUMENTS and dynamic content
+            skill_content = self._substitute_arguments(invoked_skill.content, arguments)
+            skill_content = await self._preprocess_dynamic_content(skill_content)
+
             skill_context = (
                 f"[User invoked skill: /{invoked_skill.name}]\n\n"
                 f"<skill-content name=\"{invoked_skill.name}\">\n"
-                f"{invoked_skill.content}\n"
+                f"{skill_content}\n"
                 f"</skill-content>\n\n"
                 f"User input: {user_input}"
             )
