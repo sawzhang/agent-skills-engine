@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from agent_skills_engine.agent import AgentMessage
-from agent_skills_engine.context import (
+from skillkit.agent import AgentMessage
+from skillkit.context import (
     ContextManager,
     SlidingWindowCompactor,
     TokenBudgetCompactor,
@@ -282,7 +282,7 @@ class TestAgentRunnerContextIntegration:
     def _make_runner(self, **kwargs):
         from unittest.mock import MagicMock
 
-        from agent_skills_engine.agent import AgentConfig, AgentRunner
+        from skillkit.agent import AgentConfig, AgentRunner
 
         mock_engine = MagicMock()
         mock_engine.get_snapshot.return_value = MagicMock(
@@ -299,7 +299,7 @@ class TestAgentRunnerContextIntegration:
         return AgentRunner(engine=mock_engine, config=config, **kwargs)
 
     def test_model_definition_property(self):
-        from agent_skills_engine.model_registry import ModelDefinition, ModelRegistry
+        from skillkit.model_registry import ModelDefinition, ModelRegistry
 
         reg = ModelRegistry()
         reg.register(
@@ -321,14 +321,14 @@ class TestAgentRunnerContextIntegration:
         assert runner.model_definition is None
 
     def test_model_definition_none_unknown_model(self):
-        from agent_skills_engine.model_registry import ModelRegistry
+        from skillkit.model_registry import ModelRegistry
 
         reg = ModelRegistry()
         runner = self._make_runner(model_registry=reg)
         assert runner.model_definition is None
 
     def test_cumulative_usage(self):
-        from agent_skills_engine.model_registry import TokenUsage
+        from skillkit.model_registry import TokenUsage
 
         runner = self._make_runner()
         assert runner.cumulative_usage.total_tokens == 0
@@ -337,7 +337,7 @@ class TestAgentRunnerContextIntegration:
         assert runner.cumulative_usage.total_tokens == 150
 
     def test_reset_usage(self):
-        from agent_skills_engine.model_registry import TokenUsage
+        from skillkit.model_registry import TokenUsage
 
         runner = self._make_runner()
         runner._cumulative_usage += TokenUsage(input_tokens=100)
@@ -345,7 +345,7 @@ class TestAgentRunnerContextIntegration:
         assert runner.cumulative_usage.total_tokens == 0
 
     def test_get_context_usage(self):
-        from agent_skills_engine.model_registry import ModelDefinition, ModelRegistry
+        from skillkit.model_registry import ModelDefinition, ModelRegistry
 
         reg = ModelRegistry()
         reg.register(

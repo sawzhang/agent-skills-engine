@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Agent Skills Engine is a framework-agnostic skills execution engine for LLM agents. It provides a plugin-based system for defining, loading, filtering, and executing skills (capabilities) that can be made available to large language models.
+SkillKit is a framework-agnostic skills execution engine for LLM agents. It provides a plugin-based system for defining, loading, filtering, and executing skills (capabilities) that can be made available to large language models.
 
 ## Commands
 

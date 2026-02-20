@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agent_skills_engine.transports.base import TransportBase, TransportConfig
-from agent_skills_engine.transports.sse import SSETransport
-from agent_skills_engine.transports.websocket import WebSocketTransport
+from skillkit.transports.base import TransportBase, TransportConfig
+from skillkit.transports.sse import SSETransport
+from skillkit.transports.websocket import WebSocketTransport
 
 
 # ---------------------------------------------------------------------------
@@ -125,13 +125,13 @@ class TestWebSocketTransport:
 class TestAutoTransport:
     @pytest.mark.asyncio
     async def test_fallback_to_sse_on_failure(self):
-        from agent_skills_engine.transports.auto import AutoTransport
+        from skillkit.transports.auto import AutoTransport
 
         config = TransportConfig(url="ws://localhost:8080")
         transport = AutoTransport(config)
 
         with patch(
-            "agent_skills_engine.transports.auto.WebSocketTransport._acquire",
+            "skillkit.transports.auto.WebSocketTransport._acquire",
             side_effect=Exception("Connection refused"),
         ):
             chunks = [c async for c in transport.stream({})]
@@ -143,7 +143,7 @@ class TestAutoTransport:
 
     @pytest.mark.asyncio
     async def test_uses_websocket_on_success(self):
-        from agent_skills_engine.transports.auto import AutoTransport
+        from skillkit.transports.auto import AutoTransport
 
         config = TransportConfig(url="ws://localhost:8080")
         transport = AutoTransport(config)
@@ -153,7 +153,7 @@ class TestAutoTransport:
         mock_ws.__aiter__ = AsyncMock(return_value=iter([]))
 
         with patch(
-            "agent_skills_engine.transports.auto.WebSocketTransport._acquire",
+            "skillkit.transports.auto.WebSocketTransport._acquire",
             return_value=mock_ws,
         ):
             # Just verify the transport selected WebSocket
@@ -176,19 +176,19 @@ class TestAutoTransport:
 
 class TestAgentConfigTransport:
     def test_default_sse(self):
-        from agent_skills_engine.agent import AgentConfig
+        from skillkit.agent import AgentConfig
 
         config = AgentConfig()
         assert config.transport == "sse"
 
     def test_set_websocket(self):
-        from agent_skills_engine.agent import AgentConfig
+        from skillkit.agent import AgentConfig
 
         config = AgentConfig(transport="websocket")
         assert config.transport == "websocket"
 
     def test_set_auto(self):
-        from agent_skills_engine.agent import AgentConfig
+        from skillkit.agent import AgentConfig
 
         config = AgentConfig(transport="auto")
         assert config.transport == "auto"

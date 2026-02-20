@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from agent_skills_engine.tui.component import Component
-from agent_skills_engine.tui.container import Container
-from agent_skills_engine.tui.input_widget import InputWidget
-from agent_skills_engine.tui.keys import Key, KEY_UP, KEY_DOWN, KEY_ENTER, KEY_LEFT, KEY_RIGHT
-from agent_skills_engine.tui.select_list import ListItem, SelectList
+from skillkit.tui.component import Component
+from skillkit.tui.container import Container
+from skillkit.tui.input_widget import InputWidget
+from skillkit.tui.keys import Key, KEY_UP, KEY_DOWN, KEY_ENTER, KEY_LEFT, KEY_RIGHT
+from skillkit.tui.select_list import ListItem, SelectList
 
 
 # ---------------------------------------------------------------------------

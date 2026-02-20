@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from agent_skills_engine.tools import (
+from skillkit.tools import (
     ToolRegistry,
     ToolDefinition,
     ReadTool,

@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from agent_skills_engine.runtime.base import ExecutionResult, SkillRuntime, OutputCallback
-from agent_skills_engine.runtime.bash import BashRuntime
+from skillkit.runtime.base import ExecutionResult, SkillRuntime, OutputCallback
+from skillkit.runtime.bash import BashRuntime
 
 
 # ---------------------------------------------------------------------------

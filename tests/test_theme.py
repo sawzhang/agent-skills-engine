@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_skills_engine.tui.theme import (
+from skillkit.tui.theme import (
     ALL_COLOR_KEYS,
     DEFAULT_DARK_THEME,
     THEME_SCHEMA,

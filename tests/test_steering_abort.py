@@ -10,20 +10,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agent_skills_engine.agent import (
+from skillkit.agent import (
     AgentAbortedError,
     AgentConfig,
     AgentMessage,
     AgentRunner,
 )
-from agent_skills_engine.engine import SkillsEngine
-from agent_skills_engine.events import (
+from skillkit.engine import SkillsEngine
+from skillkit.events import (
     TOOL_EXECUTION_UPDATE,
     EventBus,
     StreamEvent,
     ToolExecutionUpdateEvent,
 )
-from agent_skills_engine.runtime.base import ExecutionResult
+from skillkit.runtime.base import ExecutionResult
 
 
 # ---------------------------------------------------------------------------
@@ -524,13 +524,13 @@ class TestExecuteToolIntegration:
 
 class TestPhase3Exports:
     def test_agent_aborted_error_exported(self) -> None:
-        from agent_skills_engine import AgentAbortedError
+        from skillkit import AgentAbortedError
         assert AgentAbortedError is not None
 
     def test_tool_execution_update_exported(self) -> None:
-        from agent_skills_engine import TOOL_EXECUTION_UPDATE
+        from skillkit import TOOL_EXECUTION_UPDATE
         assert TOOL_EXECUTION_UPDATE == "tool_execution_update"
 
     def test_tool_execution_update_event_exported(self) -> None:
-        from agent_skills_engine import ToolExecutionUpdateEvent
+        from skillkit import ToolExecutionUpdateEvent
         assert ToolExecutionUpdateEvent is not None

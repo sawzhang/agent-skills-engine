@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from agent_skills_engine.prompts import PromptTemplate, PromptTemplateLoader
+from skillkit.prompts import PromptTemplate, PromptTemplateLoader
 
 
 @pytest.fixture

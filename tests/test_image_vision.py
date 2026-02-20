@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_skills_engine.models import ImageContent, MessageContent, TextContent
+from skillkit.models import ImageContent, MessageContent, TextContent
 
 
 class TestTextContent:

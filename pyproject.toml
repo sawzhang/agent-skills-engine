@@ -1,5 +1,5 @@
 [project]
-name = "agent-skills-engine"
+name = "skillkit"
 version = "0.1.0"
 description = "A standalone skills execution engine for LLM agents"
 readme = "README.md"
@@ -49,18 +49,18 @@ memory = ["httpx>=0.24"]
 web = ["starlette>=0.27", "uvicorn>=0.23"]
 
 [project.urls]
-Homepage = "https://github.com/alexzhang2015/agent-skills-engine"
-Repository = "https://github.com/alexzhang2015/agent-skills-engine"
+Homepage = "https://github.com/alexzhang2015/skillkit"
+Repository = "https://github.com/alexzhang2015/skillkit"
 
 [project.scripts]
-skills = "agent_skills_engine.cli:main"
+skills = "skillkit.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_skills_engine"]
+packages = ["src/skillkit"]
 
 [tool.ruff]
 line-length = 100

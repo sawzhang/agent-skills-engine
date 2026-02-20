@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_skills_engine.context_files import (
+from skillkit.context_files import (
     CONTEXT_FILE_NAMES,
     ContextFile,
     load_context_files,
@@ -40,11 +40,11 @@ class TestLoadContextFiles:
         assert result == []
 
     def test_finds_agents_md_in_home_dir(self, tmp_path: Path) -> None:
-        """Should find AGENTS.md in ~/.agent-skills/."""
+        """Should find AGENTS.md in ~/.skillkit/."""
         home_dir = tmp_path / "home"
-        agent_skills_dir = home_dir / ".agent-skills"
-        agent_skills_dir.mkdir(parents=True)
-        (agent_skills_dir / "AGENTS.md").write_text("global context")
+        sk_dir = home_dir / ".skillkit"
+        sk_dir.mkdir(parents=True)
+        (sk_dir / "AGENTS.md").write_text("global context")
 
         cwd = tmp_path / "project"
         cwd.mkdir()
@@ -53,7 +53,7 @@ class TestLoadContextFiles:
 
         assert len(result) == 1
         assert result[0].content == "global context"
-        assert result[0].path == (agent_skills_dir / "AGENTS.md").resolve()
+        assert result[0].path == (sk_dir / "AGENTS.md").resolve()
 
     def test_finds_claude_md_in_cwd(self, tmp_path: Path) -> None:
         """Should find CLAUDE.md in the current working directory."""
@@ -139,9 +139,9 @@ class TestLoadContextFiles:
     def test_home_dir_file_appears_before_ancestor_files(self, tmp_path: Path) -> None:
         """Global context from home_dir should appear before ancestor files."""
         home_dir = tmp_path / "home"
-        agent_skills_dir = home_dir / ".agent-skills"
-        agent_skills_dir.mkdir(parents=True)
-        (agent_skills_dir / "AGENTS.md").write_text("global")
+        sk_dir = home_dir / ".skillkit"
+        sk_dir.mkdir(parents=True)
+        (sk_dir / "AGENTS.md").write_text("global")
 
         cwd = tmp_path / "project"
         cwd.mkdir()

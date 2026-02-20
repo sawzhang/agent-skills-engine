@@ -2,7 +2,7 @@
 
 import pytest
 
-from agent_skills_engine.cache import get_cache_control_anthropic, get_cache_config_openai
+from skillkit.cache import get_cache_control_anthropic, get_cache_config_openai
 
 
 class TestGetCacheControlAnthropic:

@@ -8,9 +8,9 @@ from textwrap import dedent
 
 import pytest
 
-from agent_skills_engine import SkillsConfig, SkillsEngine
-from agent_skills_engine.commands import CommandRegistry, CommandResult
-from agent_skills_engine.models import (
+from skillkit import SkillsConfig, SkillsEngine
+from skillkit.commands import CommandRegistry, CommandResult
+from skillkit.models import (
     Skill,
     SkillAction,
     SkillActionParam,

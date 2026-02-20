@@ -1,4 +1,4 @@
-# Agent Skills Engine
+# SkillKit
 
 A standalone, framework-agnostic skills execution engine for LLM agents. Provides a Claude Code-like experience with automatic skill discovery, loading, and execution.
 
@@ -18,13 +18,13 @@ A standalone, framework-agnostic skills execution engine for LLM agents. Provide
 
 ```bash
 # With uv (recommended)
-uv add agent-skills-engine
+uv add skillkit
 
 # Basic installation
-pip install agent-skills-engine
+pip install skillkit
 
 # With all dependencies
-pip install agent-skills-engine[openai]
+pip install skillkit[openai]
 ```
 
 ## Quick Start
@@ -46,7 +46,7 @@ OPENAI_API_KEY=your-openai-key
 ```python
 import asyncio
 from pathlib import Path
-from agent_skills_engine import create_agent
+from skillkit import create_agent
 
 async def main():
     # Create agent with automatic skill loading
@@ -161,7 +161,7 @@ disable-model-invocation: false   # Hide from LLM system prompt
 ### AgentRunner
 
 ```python
-from agent_skills_engine import AgentRunner, AgentConfig, create_agent
+from skillkit import AgentRunner, AgentConfig, create_agent
 
 # Quick creation
 agent = await create_agent(
@@ -191,7 +191,7 @@ await agent.run_interactive()                   # Interactive mode
 ### SkillsEngine (Low-level)
 
 ```python
-from agent_skills_engine import SkillsEngine, SkillsConfig
+from skillkit import SkillsEngine, SkillsConfig
 
 engine = SkillsEngine(
     config=SkillsConfig(
@@ -284,7 +284,7 @@ default_timeout_seconds: 30
 ### Custom Loader
 
 ```python
-from agent_skills_engine.loaders import SkillLoader
+from skillkit.loaders import SkillLoader
 
 class YAMLSkillLoader(SkillLoader):
     def can_load(self, path: Path) -> bool:
@@ -298,7 +298,7 @@ class YAMLSkillLoader(SkillLoader):
 ### Custom Filter
 
 ```python
-from agent_skills_engine.filters import SkillFilter
+from skillkit.filters import SkillFilter
 
 class TeamSkillFilter(SkillFilter):
     def filter(self, skill, config, context) -> FilterResult:
@@ -311,7 +311,7 @@ class TeamSkillFilter(SkillFilter):
 ### Custom Runtime
 
 ```python
-from agent_skills_engine.runtime import SkillRuntime
+from skillkit.runtime import SkillRuntime
 
 class DockerRuntime(SkillRuntime):
     async def execute(self, command, cwd, env, timeout):
@@ -323,8 +323,8 @@ class DockerRuntime(SkillRuntime):
 
 ```bash
 # Clone and install
-git clone https://github.com/sawzhang/agent-skills-engine.git
-cd agent-skills-engine
+git clone https://github.com/sawzhang/skillkit.git
+cd skillkit
 uv sync
 
 # Run tests

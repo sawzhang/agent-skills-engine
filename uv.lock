@@ -13,76 +13,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "agent-skills-engine"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "markitdown", extra = ["pptx"] },
-    { name = "openai" },
-    { name = "partial-json-parser" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "pypdf" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "reportlab" },
-    { name = "rich" },
-    { name = "watchfiles" },
-]
-
-[package.optional-dependencies]
-anthropic = [
-    { name = "anthropic" },
-]
-dev = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
-memory = [
-    { name = "httpx" },
-]
-openai = [
-    { name = "openai" },
-]
-web = [
-    { name = "starlette" },
-    { name = "uvicorn" },
-]
-websockets = [
-    { name = "websockets" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.18" },
-    { name = "httpx", marker = "extra == 'memory'", specifier = ">=0.24" },
-    { name = "markitdown", extras = ["pptx"], specifier = ">=0.1.4" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
-    { name = "openai", specifier = ">=2.16.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
-    { name = "partial-json-parser", specifier = ">=0.1" },
-    { name = "pillow", specifier = ">=12.1.0" },
-    { name = "pydantic", specifier = ">=2.0" },
-    { name = "pypdf", specifier = ">=6.6.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "reportlab", specifier = ">=4.4.9" },
-    { name = "rich", specifier = ">=13.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
-    { name = "starlette", marker = "extra == 'web'", specifier = ">=0.27" },
-    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
-    { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.23" },
-    { name = "watchfiles", specifier = ">=0.21" },
-    { name = "websockets", marker = "extra == 'websockets'", specifier = ">=12.0" },
-]
-provides-extras = ["dev", "openai", "anthropic", "websockets", "memory", "web"]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1541,6 +1471,76 @@ sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
 ]
+
+[[package]]
+name = "skillkit"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "markitdown", extra = ["pptx"] },
+    { name = "openai" },
+    { name = "partial-json-parser" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "pypdf" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "reportlab" },
+    { name = "rich" },
+    { name = "watchfiles" },
+]
+
+[package.optional-dependencies]
+anthropic = [
+    { name = "anthropic" },
+]
+dev = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+memory = [
+    { name = "httpx" },
+]
+openai = [
+    { name = "openai" },
+]
+web = [
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+websockets = [
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.18" },
+    { name = "httpx", marker = "extra == 'memory'", specifier = ">=0.24" },
+    { name = "markitdown", extras = ["pptx"], specifier = ">=0.1.4" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
+    { name = "openai", specifier = ">=2.16.0" },
+    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
+    { name = "partial-json-parser", specifier = ">=0.1" },
+    { name = "pillow", specifier = ">=12.1.0" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pypdf", specifier = ">=6.6.2" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "reportlab", specifier = ">=4.4.9" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
+    { name = "starlette", marker = "extra == 'web'", specifier = ">=0.27" },
+    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.23" },
+    { name = "watchfiles", specifier = ">=0.21" },
+    { name = "websockets", marker = "extra == 'websockets'", specifier = ">=12.0" },
+]
+provides-extras = ["dev", "openai", "anthropic", "websockets", "memory", "web"]
 
 [[package]]
 name = "sniffio"

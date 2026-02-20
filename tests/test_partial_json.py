@@ -6,7 +6,7 @@ import importlib
 
 import pytest
 
-from agent_skills_engine.utils.json_parse import parse_streaming_json
+from skillkit.utils.json_parse import parse_streaming_json
 
 # Detect whether partial_json_parser is available so we can conditionally test.
 _has_partial_json_parser = importlib.util.find_spec("partial_json_parser") is not None

@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from agent_skills_engine.modes.json_mode import JsonMode
+from skillkit.modes.json_mode import JsonMode
 
 
 def _make_stream_event(

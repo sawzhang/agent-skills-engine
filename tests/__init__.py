@@ -1,1 +1,1 @@
-"""Tests for agent-skills-engine."""
+"""Tests for skillkit."""

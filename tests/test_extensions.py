@@ -9,10 +9,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent_skills_engine import SkillsConfig, SkillsEngine
-from agent_skills_engine.extensions.api import ExtensionAPI
-from agent_skills_engine.extensions.manager import ExtensionManager
-from agent_skills_engine.extensions.models import (
+from skillkit import SkillsConfig, SkillsEngine
+from skillkit.extensions.api import ExtensionAPI
+from skillkit.extensions.manager import ExtensionManager
+from skillkit.extensions.models import (
     SKILL_LOADED,
     SESSION_START,
     CommandInfo,

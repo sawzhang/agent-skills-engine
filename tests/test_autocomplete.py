@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from agent_skills_engine.tui.autocomplete import (
+from skillkit.tui.autocomplete import (
     CombinedAutocomplete,
     CommandAutocomplete,
     FileAutocomplete,
