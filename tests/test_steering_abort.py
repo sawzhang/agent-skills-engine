@@ -37,6 +37,7 @@ def _make_runner(
 ) -> AgentRunner:
     """Create an AgentRunner with mocked internals for testing."""
     engine = MagicMock(spec=SkillsEngine)
+    engine.extensions = None
     engine.get_snapshot.return_value = MagicMock(skills=[], prompt="", get_skill=lambda n: None)
 
     config = AgentConfig(

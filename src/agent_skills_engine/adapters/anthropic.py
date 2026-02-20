@@ -243,7 +243,6 @@ class AnthropicAdapter(LLMAdapter):
         - content_block_delta (input_json_delta) → tool_call_delta
         - content_block_stop (tool_use) → tool_call_end
         """
-        import json
 
         full_system = self.build_system_prompt(system_prompt or "")
         anthropic_messages = self._build_anthropic_messages(messages)

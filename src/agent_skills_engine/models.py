@@ -14,6 +14,31 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+# ---------------------------------------------------------------------------
+# Content types for multi-modal messages
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TextContent:
+    """Text content block within a message."""
+
+    type: str = "text"
+    text: str = ""
+
+
+@dataclass
+class ImageContent:
+    """Image content block within a message (base64-encoded)."""
+
+    type: str = "image"
+    data: str = ""  # base64-encoded image data
+    mime_type: str = "image/png"  # e.g. image/png, image/jpeg, image/gif, image/webp
+
+
+# Union type for message content
+MessageContent = str | list[TextContent | ImageContent]
+
 
 class SkillSource(str, Enum):
     """Origin of a skill definition."""

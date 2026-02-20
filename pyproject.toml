@@ -31,6 +31,7 @@ dependencies = [
     "pillow>=12.1.0",
     "markitdown[pptx]>=0.1.4",
     "reportlab>=4.4.9",
+    "partial-json-parser>=0.1",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +45,8 @@ dev = [
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.18"]
 websockets = ["websockets>=12.0"]
+memory = ["httpx>=0.24"]
+web = ["starlette>=0.27", "uvicorn>=0.23"]
 
 [project.urls]
 Homepage = "https://github.com/alexzhang2015/agent-skills-engine"

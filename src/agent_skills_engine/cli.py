@@ -8,6 +8,7 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
 from rich.console import Console
@@ -167,6 +168,36 @@ def main() -> None:
         "-d", "--dir", action="append", dest="dirs", help="Skill directories"
     )
 
+    # Chat command (interactive or mode-based)
+    chat_parser = subparsers.add_parser("chat", help="Start interactive chat or run in a mode")
+    chat_parser.add_argument(
+        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
+    )
+    chat_parser.add_argument(
+        "--mode",
+        choices=["interactive", "json", "rpc"],
+        default="interactive",
+        help="Execution mode (default: interactive)",
+    )
+    chat_parser.add_argument(
+        "--model", default=None, help="Model to use"
+    )
+    chat_parser.add_argument(
+        "prompt_text", nargs="?", default=None, help="Prompt text (for json mode)"
+    )
+
+    # Serve command (web UI)
+    serve_parser = subparsers.add_parser("serve", help="Start the web UI server")
+    serve_parser.add_argument(
+        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
+    )
+    serve_parser.add_argument(
+        "--host", default="127.0.0.1", help="Host to bind to"
+    )
+    serve_parser.add_argument(
+        "--port", type=int, default=8080, help="Port to bind to"
+    )
+
     args = parser.parse_args()
 
     # Setup logging based on verbosity
@@ -195,6 +226,10 @@ def main() -> None:
         cmd_prompts(args)
     elif args.command == "commands":
         cmd_commands(args)
+    elif args.command == "chat":
+        asyncio.run(cmd_chat(args))
+    elif args.command == "serve":
+        cmd_serve(args)
     else:
         parser.print_help()
 
@@ -641,6 +676,64 @@ def cmd_commands(args: argparse.Namespace) -> None:
 
     console.print(table)
     console.print(f"\n[dim]Total: {len(commands)} commands[/dim]")
+
+
+async def cmd_chat(args: argparse.Namespace) -> None:
+    """Start interactive chat or run in a specific mode."""
+    from agent_skills_engine.agent import AgentConfig, AgentRunner
+
+    engine = _create_engine(getattr(args, "dirs", None))
+    config_kwargs: dict[str, Any] = {}
+    if args.model:
+        config_kwargs["model"] = args.model
+
+    agent_config = AgentConfig.from_env(**config_kwargs)
+    agent = AgentRunner(engine, agent_config)
+
+    mode = args.mode
+    if mode == "json":
+        from agent_skills_engine.modes.json_mode import JsonMode
+
+        prompt_text = args.prompt_text
+        if not prompt_text:
+            console.print("[red]Error: JSON mode requires a prompt argument[/red]")
+            sys.exit(1)
+        json_mode = JsonMode()
+        await json_mode.run(agent, prompt_text)
+    elif mode == "rpc":
+        from agent_skills_engine.modes.rpc_mode import RpcMode
+
+        rpc_mode = RpcMode()
+        await rpc_mode.run(agent)
+    else:
+        # Interactive mode (default)
+        from agent_skills_engine.modes.interactive import InteractiveMode
+
+        interactive = InteractiveMode()
+        await interactive.run(agent)
+
+
+def cmd_serve(args: argparse.Namespace) -> None:
+    """Start the web UI server."""
+    from agent_skills_engine.agent import AgentConfig, AgentRunner
+
+    engine = _create_engine(getattr(args, "dirs", None))
+    agent_config = AgentConfig.from_env()
+    agent = AgentRunner(engine, agent_config)
+
+    try:
+        from agent_skills_engine.web.server import run_server
+
+        console.print(
+            f"[green]Starting web UI at http://{args.host}:{args.port}[/green]"
+        )
+        run_server(agent=agent, host=args.host, port=args.port)
+    except ImportError:
+        console.print(
+            "[red]Web UI requires the 'web' extra. "
+            "Install with: pip install agent-skills-engine[web][/red]"
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

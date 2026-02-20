@@ -35,7 +35,12 @@ from agent_skills_engine.agent import (
     AgentRunner,
     create_agent,
 )
+from agent_skills_engine.cache import (
+    get_cache_config_openai,
+    get_cache_control_anthropic,
+)
 from agent_skills_engine.commands import CommandRegistry, CommandResult
+from agent_skills_engine.config import CacheRetention, SkillEntryConfig, SkillsConfig
 from agent_skills_engine.context import (
     ContextCompactor,
     ContextManager,
@@ -45,13 +50,19 @@ from agent_skills_engine.context import (
     estimate_messages_tokens,
     estimate_tokens,
 )
+from agent_skills_engine.context_files import ContextFile, load_context_files
+from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.events import (
+    AFTER_TOOL_RESULT,
     AGENT_END,
     AGENT_START,
-    AFTER_TOOL_RESULT,
     BEFORE_TOOL_CALL,
+    COMPACTION,
     CONTEXT_TRANSFORM,
     INPUT,
+    MODEL_CHANGE,
+    SESSION_END,
+    SESSION_START,
     TOOL_EXECUTION_UPDATE,
     TURN_END,
     TURN_START,
@@ -59,11 +70,15 @@ from agent_skills_engine.events import (
     AgentEndEvent,
     AgentStartEvent,
     BeforeToolCallEvent,
+    CompactionEvent,
     ContextTransformEvent,
     ContextTransformEventResult,
     EventBus,
     InputEvent,
     InputEventResult,
+    ModelChangeEvent,
+    SessionEndEvent,
+    SessionStartEvent,
     StreamEvent,
     ToolCallEventResult,
     ToolExecutionUpdateEvent,
@@ -71,8 +86,6 @@ from agent_skills_engine.events import (
     TurnEndEvent,
     TurnStartEvent,
 )
-from agent_skills_engine.config import SkillEntryConfig, SkillsConfig
-from agent_skills_engine.engine import SkillsEngine
 from agent_skills_engine.extensions import (
     CommandInfo,
     ExtensionAPI,
@@ -81,6 +94,7 @@ from agent_skills_engine.extensions import (
     ToolInfo,
 )
 from agent_skills_engine.filters import DefaultSkillFilter, SkillFilter
+from agent_skills_engine.loaders import MarkdownSkillLoader, SkillLoader
 from agent_skills_engine.model_registry import (
     DEFAULT_THINKING_BUDGETS,
     CostBreakdown,
@@ -94,8 +108,9 @@ from agent_skills_engine.model_registry import (
     map_thinking_level_to_anthropic_effort,
     map_thinking_level_to_openai_effort,
 )
-from agent_skills_engine.loaders import MarkdownSkillLoader, SkillLoader
 from agent_skills_engine.models import (
+    ImageContent,
+    MessageContent,
     Skill,
     SkillAction,
     SkillActionParam,
@@ -105,9 +120,16 @@ from agent_skills_engine.models import (
     SkillMetadata,
     SkillRequirements,
     SkillSnapshot,
+    TextContent,
 )
 from agent_skills_engine.prompts import PromptTemplate, PromptTemplateLoader
 from agent_skills_engine.runtime import BashRuntime, SkillRuntime
+
+# Optional: memory module
+try:
+    from agent_skills_engine.memory import MemoryConfig, OpenVikingClient, setup_memory
+except ImportError:
+    pass
 
 __version__ = "0.1.0"
 
@@ -122,9 +144,14 @@ __all__ = [
     "SkillInstallSpec",
     "SkillAction",
     "SkillActionParam",
+    # Content types (multi-modal)
+    "TextContent",
+    "ImageContent",
+    "MessageContent",
     # Config
     "SkillsConfig",
     "SkillEntryConfig",
+    "CacheRetention",
     # Engine
     "SkillsEngine",
     # Agent
@@ -144,6 +171,10 @@ __all__ = [
     "CONTEXT_TRANSFORM",
     "INPUT",
     "TOOL_EXECUTION_UPDATE",
+    "SESSION_START",
+    "SESSION_END",
+    "MODEL_CHANGE",
+    "COMPACTION",
     "ToolExecutionUpdateEvent",
     "AgentStartEvent",
     "AgentEndEvent",
@@ -158,6 +189,10 @@ __all__ = [
     "InputEvent",
     "InputEventResult",
     "StreamEvent",
+    "SessionStartEvent",
+    "SessionEndEvent",
+    "ModelChangeEvent",
+    "CompactionEvent",
     # Model Registry
     "ModelDefinition",
     "ModelCost",
@@ -179,6 +214,12 @@ __all__ = [
     "estimate_tokens",
     "estimate_message_tokens",
     "estimate_messages_tokens",
+    # Context Files
+    "ContextFile",
+    "load_context_files",
+    # Cache
+    "get_cache_control_anthropic",
+    "get_cache_config_openai",
     # Loaders
     "SkillLoader",
     "MarkdownSkillLoader",
@@ -203,4 +244,8 @@ __all__ = [
     # Prompts
     "PromptTemplate",
     "PromptTemplateLoader",
+    # Memory (optional)
+    "MemoryConfig",
+    "OpenVikingClient",
+    "setup_memory",
 ]

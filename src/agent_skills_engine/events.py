@@ -22,8 +22,8 @@ Example:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from agent_skills_engine.logging import get_logger
@@ -45,6 +45,10 @@ AFTER_TOOL_RESULT = "after_tool_result"
 CONTEXT_TRANSFORM = "context_transform"
 INPUT = "input"
 TOOL_EXECUTION_UPDATE = "tool_execution_update"
+SESSION_START = "session_start"
+SESSION_END = "session_end"
+MODEL_CHANGE = "model_change"
+COMPACTION = "compaction"
 
 
 @dataclass
@@ -65,6 +69,7 @@ class AgentEndEvent:
     total_turns: int
     finish_reason: str = ""  # "complete", "max_turns", "error"
     error: str | None = None
+    messages: list[Any] | None = None  # Conversation messages at end of loop
 
 
 @dataclass
@@ -163,6 +168,43 @@ class ToolExecutionUpdateEvent:
     turn: int
 
 
+@dataclass
+class SessionStartEvent:
+    """Emitted when a new session starts or is resumed."""
+
+    session_id: str
+    cwd: str
+    resumed: bool = False
+
+
+@dataclass
+class SessionEndEvent:
+    """Emitted when a session ends."""
+
+    session_id: str
+    entry_count: int = 0
+
+
+@dataclass
+class ModelChangeEvent:
+    """Emitted when the model is changed mid-session."""
+
+    previous_model: str
+    new_model: str
+    previous_provider: str = ""
+    new_provider: str = ""
+
+
+@dataclass
+class CompactionEvent:
+    """Emitted when context compaction occurs."""
+
+    summary: str
+    tokens_before: int = 0
+    tokens_after: int = 0
+    first_kept_entry_id: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Stream event types
 # ---------------------------------------------------------------------------
@@ -218,6 +260,9 @@ class StreamEvent:
 
     args_delta: str | None = None
     """Partial JSON arguments (for tool_call_delta)."""
+
+    parsed_args: dict[str, Any] | None = None
+    """Parsed partial arguments (for tool_call_delta, when streaming JSON parsing is active)."""
 
 
 # ---------------------------------------------------------------------------

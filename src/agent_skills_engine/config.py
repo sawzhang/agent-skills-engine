@@ -7,11 +7,26 @@ YAML/JSON files or constructed programmatically.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
+
+# ---------------------------------------------------------------------------
+# Cache retention
+# ---------------------------------------------------------------------------
+
+CacheRetention = Literal["none", "short", "long"]
+
+
+def get_cache_retention() -> CacheRetention:
+    """Get cache retention from environment variable, defaulting to 'short'."""
+    val = os.environ.get("ASE_CACHE_RETENTION", "short").lower()
+    if val in ("none", "short", "long"):
+        return val  # type: ignore[return-value]
+    return "short"
 
 
 @dataclass

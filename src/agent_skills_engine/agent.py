@@ -25,9 +25,9 @@ from dotenv import load_dotenv
 from agent_skills_engine.config import SkillsConfig
 from agent_skills_engine.context import ContextManager, estimate_messages_tokens
 from agent_skills_engine.events import (
+    AFTER_TOOL_RESULT,
     AGENT_END,
     AGENT_START,
-    AFTER_TOOL_RESULT,
     BEFORE_TOOL_CALL,
     CONTEXT_TRANSFORM,
     INPUT,
@@ -63,7 +63,12 @@ from agent_skills_engine.model_registry import (
     TokenUsage,
     Transport,
 )
-from agent_skills_engine.models import Skill, SkillSnapshot
+from agent_skills_engine.models import (
+    ImageContent,
+    Skill,
+    SkillSnapshot,
+    TextContent,
+)
 
 logger = get_logger("agent")
 
@@ -76,16 +81,39 @@ class AgentAbortedError(Exception):
 
 @dataclass
 class AgentMessage:
-    """A message in the agent conversation."""
+    """A message in the agent conversation.
+
+    The ``content`` field accepts either a plain string or a list of
+    :class:`TextContent` / :class:`ImageContent` blocks for multi-modal
+    messages.
+    """
 
     role: str  # "user", "assistant", "system", "tool"
-    content: str
+    content: str | list[TextContent | ImageContent] = ""
     name: str | None = None  # For tool messages
     tool_call_id: str | None = None  # For tool results
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     reasoning: str | None = None  # For models with reasoning (MiniMax)
     metadata: dict[str, Any] = field(default_factory=dict)
     token_usage: TokenUsage | None = None  # Token usage for this response
+
+    @property
+    def text_content(self) -> str:
+        """Get the text content of the message, extracting from blocks if needed."""
+        if isinstance(self.content, str):
+            return self.content
+        parts: list[str] = []
+        for block in self.content:
+            if isinstance(block, TextContent):
+                parts.append(block.text)
+        return "".join(parts)
+
+    @property
+    def has_images(self) -> bool:
+        """Check if this message contains image content."""
+        if isinstance(self.content, str):
+            return False
+        return any(isinstance(block, ImageContent) for block in self.content)
 
 
 @dataclass
@@ -116,13 +144,22 @@ class AgentConfig:
     watch_skills: bool = False  # Watch for skill file changes
     system_prompt: str = ""  # Base system prompt
 
+    # Cache retention
+    cache_retention: str = "short"  # "none", "short", "long"
+    session_id: str | None = None  # Session ID for cache keying
+
+    # Context files
+    load_context_files: bool = True  # Auto-discover AGENTS.md / CLAUDE.md
+
     @classmethod
     def from_env(cls, **overrides: Any) -> AgentConfig:
         """Create config from environment variables."""
+        cache_ret = os.environ.get("ASE_CACHE_RETENTION", "short")
         return cls(
             base_url=os.environ.get("OPENAI_BASE_URL"),
             api_key=os.environ.get("OPENAI_API_KEY"),
             model=os.environ.get("MINIMAX_MODEL", "MiniMax-M2.1"),
+            cache_retention=cache_ret if cache_ret in ("none", "short", "long") else "short",
             **overrides,
         )
 
@@ -166,11 +203,17 @@ class AgentRunner:
         self._conversation: list[AgentMessage] = []
         self._cumulative_usage = TokenUsage()
         self._on_skill_change: list[Callable[[set[Path]], None]] = []
+        self._context_files: list[Any] = []  # Loaded ContextFile objects
+        self._session_manager: Any = None  # SessionManager (lazy init)
 
         # Abort / steering / follow-up
         self._abort_event = asyncio.Event()
         self._steering_queue: asyncio.Queue[str] = asyncio.Queue()
         self._followup_queue: asyncio.Queue[str] = asyncio.Queue()
+
+        # Load context files if configured
+        if self.config.load_context_files:
+            self._load_context_files()
 
     @classmethod
     def create(
@@ -237,7 +280,6 @@ class AgentRunner:
         default. Returns ``None`` if no adapter is registered (in which case
         the built-in OpenAI client path is used).
         """
-        from agent_skills_engine.adapters.base import LLMAdapter
 
         if self._active_adapter_name is not None:
             try:
@@ -272,6 +314,54 @@ class AgentRunner:
             )
         self._active_adapter_name = name
         logger.info("Switched active adapter to: %s", name)
+
+    # ------------------------------------------------------------------
+    # Model switching / Session / Context files
+    # ------------------------------------------------------------------
+
+    def switch_model(
+        self,
+        model_name: str,
+        adapter_name: str | None = None,
+    ) -> None:
+        """Switch the active model (and optionally adapter) mid-conversation.
+
+        Records a ``ModelChangeEntry`` in the session if session management
+        is active.
+
+        Args:
+            model_name: New model ID.
+            adapter_name: Optional adapter to switch to.
+        """
+        previous_model = self.config.model
+        self.config.model = model_name
+        if adapter_name:
+            self.set_adapter(adapter_name)
+        logger.info("Switched model from %s to %s", previous_model, model_name)
+
+    @property
+    def session(self) -> Any:
+        """Get the session manager (lazy-initialised)."""
+        return self._session_manager
+
+    @session.setter
+    def session(self, value: Any) -> None:
+        self._session_manager = value
+
+    @property
+    def context_files(self) -> list[Any]:
+        """Get loaded context files."""
+        return list(self._context_files)
+
+    def _load_context_files(self) -> None:
+        """Discover and load AGENTS.md / CLAUDE.md files."""
+        try:
+            from agent_skills_engine.context_files import load_context_files
+
+            self._context_files = load_context_files(Path.cwd())
+        except Exception as e:
+            logger.debug("Failed to load context files: %s", e)
+            self._context_files = []
 
     # ------------------------------------------------------------------
     # Abort / Steering / Follow-up
@@ -349,8 +439,8 @@ class AgentRunner:
         """Get or create the OpenAI client."""
         if self._client is None:
             try:
-                from openai import AsyncOpenAI
                 import httpx
+                from openai import AsyncOpenAI
             except ImportError:
                 raise ImportError(
                     "AgentRunner requires the 'openai' package. "
@@ -394,12 +484,18 @@ class AgentRunner:
         return self.snapshot.get_skill(name)
 
     def build_system_prompt(self) -> str:
-        """Build the complete system prompt with skills injected."""
+        """Build the complete system prompt with skills and context files injected."""
         parts = []
 
         # Base system prompt
         if self.config.system_prompt:
             parts.append(self.config.system_prompt)
+
+        # Context files (AGENTS.md / CLAUDE.md)
+        for ctx_file in self._context_files:
+            parts.append(
+                f"<context-file path=\"{ctx_file.path}\">\n{ctx_file.content}\n</context-file>"
+            )
 
         # Skills prompt
         skills_prompt = self.snapshot.prompt
@@ -414,7 +510,8 @@ class AgentRunner:
                 f"\n<user-invocable-skills>\n"
                 f"The following skills are available for the user to invoke:\n"
                 f"{skill_list}\n"
-                f"When the user types a skill name (e.g., /pdf), provide guidance on using that skill.\n"
+                f"When the user types a skill name (e.g., /pdf), provide guidance "
+                f"on using that skill.\n"
                 f"</user-invocable-skills>"
             )
 
@@ -425,7 +522,7 @@ class AgentRunner:
         if not self.config.enable_tools:
             return []
 
-        return [
+        tools = [
             {
                 "type": "function",
                 "function": {
@@ -470,12 +567,51 @@ class AgentRunner:
             },
         ]
 
+        # Append extension-registered tools
+        if self.engine.extensions:
+            for tool_info in self.engine.extensions.get_tools():
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": tool_info.name,
+                        "description": tool_info.description,
+                        "parameters": tool_info.parameters,
+                    },
+                })
+
+        return tools
+
+    @staticmethod
+    def _format_content_for_openai(
+        content: str | list[TextContent | ImageContent],
+    ) -> str | list[dict[str, Any]]:
+        """Format message content for the OpenAI API, handling images."""
+        if isinstance(content, str):
+            return content
+        parts: list[dict[str, Any]] = []
+        for block in content:
+            if isinstance(block, TextContent):
+                parts.append({"type": "text", "text": block.text})
+            elif isinstance(block, ImageContent):
+                data_url = f"data:{block.mime_type};base64,{block.data}"
+                parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": data_url},
+                })
+        return parts if parts else ""
+
     def _format_messages(
         self,
         messages: list[AgentMessage],
     ) -> list[dict[str, Any]]:
         """Format messages for the OpenAI API."""
         formatted = []
+
+        # Check if current model supports vision
+        model_def = self.model_definition
+        supports_vision = model_def is not None and "image" in (
+            model_def.input_modalities or []
+        )
 
         # Add system prompt
         system_prompt = self.build_system_prompt()
@@ -488,15 +624,25 @@ class AgentRunner:
         # Add conversation messages
         for msg in messages:
             if msg.role == "tool":
+                content = (
+                    msg.text_content
+                    if not isinstance(msg.content, str)
+                    else msg.content
+                )
                 formatted.append({
                     "role": "tool",
-                    "content": msg.content,
+                    "content": content,
                     "tool_call_id": msg.tool_call_id,
                 })
             elif msg.tool_calls:
+                content = (
+                    (msg.text_content or None)
+                    if not isinstance(msg.content, str)
+                    else (msg.content or None)
+                )
                 formatted.append({
                     "role": "assistant",
-                    "content": msg.content or None,
+                    "content": content,
                     "tool_calls": [
                         {
                             "id": tc["id"],
@@ -509,10 +655,21 @@ class AgentRunner:
                         for tc in msg.tool_calls
                     ],
                 })
-            else:
+            elif msg.has_images and supports_vision:
+                # Multi-modal message with images
                 formatted.append({
                     "role": msg.role,
-                    "content": msg.content,
+                    "content": self._format_content_for_openai(msg.content),
+                })
+            else:
+                content = (
+                    msg.text_content
+                    if not isinstance(msg.content, str)
+                    else msg.content
+                )
+                formatted.append({
+                    "role": msg.role,
+                    "content": content,
                 })
 
         return formatted
@@ -685,6 +842,15 @@ class AgentRunner:
             if result.success:
                 return result.output or "(no output)"
             return f"Error (exit {result.exit_code}): {result.error}"
+
+        # Dispatch to extension-registered tools
+        if self.engine.extensions:
+            for tool_info in self.engine.extensions.get_tools():
+                if tool_info.name == name and tool_info.handler:
+                    result = tool_info.handler(**args)
+                    if asyncio.iscoroutine(result):
+                        result = await result
+                    return str(result) if result is not None else "(no output)"
 
         return f"Error: Unknown tool '{name}'"
 
@@ -962,6 +1128,7 @@ class AgentRunner:
                     ]),
                     finish_reason=finish_reason,
                     error=error_msg,
+                    messages=list(self._conversation),
                 ),
             )
 
@@ -1399,6 +1566,7 @@ class AgentRunner:
                     ]),
                     finish_reason=finish_reason,
                     error=error_msg,
+                    messages=list(self._conversation),
                 ),
             )
 

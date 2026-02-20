@@ -313,7 +313,7 @@ class SkillsEngine:
         env: dict[str, str] | None = None,
         timeout: float | None = None,
         on_output: Callable[[str], None] | None = None,
-        abort_signal: "asyncio.Event | None" = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> ExecutionResult:
         """
         Execute a command using the runtime.
@@ -351,7 +351,7 @@ class SkillsEngine:
         env: dict[str, str] | None = None,
         timeout: float | None = None,
         on_output: Callable[[str], None] | None = None,
-        abort_signal: "asyncio.Event | None" = None,
+        abort_signal: asyncio.Event | None = None,
     ) -> ExecutionResult:
         """
         Execute a script using the runtime.
