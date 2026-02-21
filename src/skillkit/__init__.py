@@ -123,7 +123,7 @@ from skillkit.models import (
     TextContent,
 )
 from skillkit.prompts import PromptTemplate, PromptTemplateLoader
-from skillkit.runtime import BashRuntime, SkillRuntime
+from skillkit.runtime import BashRuntime, CodeModeRuntime, SkillRuntime
 
 # Optional: memory module
 try:
@@ -229,6 +229,7 @@ __all__ = [
     # Runtime
     "SkillRuntime",
     "BashRuntime",
+    "CodeModeRuntime",
     # Adapters
     "AdapterRegistry",
     "AdapterFactory",
