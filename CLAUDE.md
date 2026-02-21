@@ -56,7 +56,7 @@ Each subsystem has an abstract base class and reference implementation:
 |-----------|------------|----------------|---------|
 | Loaders | `SkillLoader` | `MarkdownSkillLoader` | Parse skill files (Markdown + YAML frontmatter) |
 | Filters | `SkillFilter` | `DefaultSkillFilter` | Check eligibility (bins, env vars, OS, config) |
-| Runtimes | `SkillRuntime` | `BashRuntime` | Execute commands with timeout and env injection |
+| Runtimes | `SkillRuntime` | `BashRuntime`, `CodeModeRuntime` | Execute commands with timeout and env injection |
 | Adapters | `LLMAdapter` | `OpenAIAdapter`, `AnthropicAdapter` | Integrate with LLM providers |
 
 ### Skill Definition Format
@@ -104,6 +104,33 @@ The system prompt only contains skill **names and descriptions** (metadata). Ful
 `AgentRunner.validate_skill(skill)` enforces:
 - Name: ≤64 chars, lowercase alphanumeric + hyphens, no leading hyphen
 - Description: non-empty, ≤1024 chars
+
+### CodeModeRuntime (search + execute pattern)
+
+Inspired by Cloudflare's code-mode-mcp. Instead of exposing N tools (one per API endpoint), `CodeModeRuntime` exposes just 2 tools — `search` and `execute` — and lets the LLM write Python code against injected data and clients. Token cost is O(1) regardless of API surface area.
+
+```python
+runtime = CodeModeRuntime(
+    spec=openapi_spec,              # Any data for discovery (dict, list, etc.)
+    ctx={"client": httpx.Client()}, # Objects injected into execute mode
+)
+
+# search: spec only, no ctx (read-only discovery)
+await runtime.search("[p for p in spec['paths'] if '/users' in p]")
+
+# run/execute: spec + ctx (call APIs, mutate state)
+await runtime.run("result = ctx['client'].get('/users')")
+
+# Generate 2-tool definitions for LLM adapters (OpenAI format)
+tools = runtime.get_tool_definitions()  # → [search, execute]
+```
+
+- **Two execution modes**: `search(code)` injects `spec` only; `run(code)` / `execute(code)` injects both `spec` and `ctx`
+- **Two sandbox modes**: `"inprocess"` (exec with restricted builtins, works with any Python objects) and `"subprocess"` (child process isolation, JSON-serializable data only)
+- **Safe builtins**: restricted `__import__` only allows configured modules (default: json, re, math, datetime, collections, itertools, functools, urllib.parse)
+- **`get_tool_definitions()`**: generates OpenAI function-calling format tool definitions with spec hints and ctx key names
+- **Drop-in replacement**: implements `SkillRuntime`, can be passed to `SkillsEngine(runtime=CodeModeRuntime(...))`
+- **Result convention**: user code assigns to `result` for structured output, or uses `print()` for text output
 
 ### Key Patterns
 
