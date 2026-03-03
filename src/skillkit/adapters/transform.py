@@ -1,4 +1,5 @@
 """Cross-provider message transformation utilities."""
+
 from __future__ import annotations
 
 import hashlib
@@ -106,14 +107,14 @@ def transform_messages(
         if msg.get("role") == "assistant":
             for tc in msg.get("tool_calls", []):
                 tc_id = tc.get("id", "")
-                original_id = next(
-                    (k for k, v in id_mapping.items() if v == tc_id), tc_id
-                )
+                original_id = next((k for k, v in id_mapping.items() if v == tc_id), tc_id)
                 if original_id not in tool_result_ids and tc_id not in tool_result_ids:
-                    final.append({
-                        "role": "tool",
-                        "content": "",
-                        "tool_call_id": tc_id,
-                    })
+                    final.append(
+                        {
+                            "role": "tool",
+                            "content": "",
+                            "tool_call_id": tc_id,
+                        }
+                    )
 
     return final

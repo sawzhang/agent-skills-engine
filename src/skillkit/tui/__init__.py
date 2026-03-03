@@ -5,6 +5,7 @@ Provides components for building interactive terminal interfaces including
 text input, multi-line editing, markdown rendering, select lists, overlays,
 keybinding management, and autocomplete.
 """
+
 from __future__ import annotations
 
 from skillkit.tui.autocomplete import (

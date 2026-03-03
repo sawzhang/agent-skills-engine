@@ -22,8 +22,10 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from skillkit.adapters.registry import AdapterRegistry
 from skillkit.config import SkillsConfig
 from skillkit.context import ContextManager, estimate_messages_tokens
+from skillkit.engine import SkillsEngine
 from skillkit.events import (
     AFTER_TOOL_RESULT,
     AGENT_END,
@@ -50,11 +52,6 @@ from skillkit.events import (
     TurnEndEvent,
     TurnStartEvent,
 )
-
-# Auto-load .env file from current directory or parent directories
-load_dotenv(override=True)
-from skillkit.adapters.registry import AdapterRegistry
-from skillkit.engine import SkillsEngine
 from skillkit.logging import get_logger
 from skillkit.model_registry import (
     ModelDefinition,
@@ -69,6 +66,9 @@ from skillkit.models import (
     SkillSnapshot,
     TextContent,
 )
+
+# Auto-load .env file from current directory or parent directories
+load_dotenv(override=True)
 
 logger = get_logger("agent")
 
@@ -287,7 +287,8 @@ class AgentRunner:
         if self._active_adapter_name is not None:
             try:
                 return self.adapter_registry.get(
-                    self._active_adapter_name, engine=self.engine,
+                    self._active_adapter_name,
+                    engine=self.engine,
                 )
             except KeyError:
                 logger.warning(
@@ -312,9 +313,7 @@ class AgentRunner:
         """
         if not self.adapter_registry.has(name):
             available = ", ".join(self.adapter_registry.list_adapters()) or "(none)"
-            raise KeyError(
-                f"Adapter '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"Adapter '{name}' not found. Available: {available}")
         self._active_adapter_name = name
         logger.info("Switched active adapter to: %s", name)
 
@@ -446,8 +445,7 @@ class AgentRunner:
                 from openai import AsyncOpenAI
             except ImportError:
                 raise ImportError(
-                    "AgentRunner requires the 'openai' package. "
-                    "Install with: pip install openai"
+                    "AgentRunner requires the 'openai' package. Install with: pip install openai"
                 )
 
             # Create httpx client without proxy to avoid SOCKS proxy issues
@@ -477,10 +475,7 @@ class AgentRunner:
     @property
     def user_invocable_skills(self) -> list[Skill]:
         """Get skills that can be invoked by user commands."""
-        return [
-            s for s in self.skills
-            if s.metadata.invocation.user_invocable
-        ]
+        return [s for s in self.skills if s.metadata.invocation.user_invocable]
 
     def get_skill(self, name: str) -> Skill | None:
         """Get a skill by name."""
@@ -497,7 +492,7 @@ class AgentRunner:
         # Context files (AGENTS.md / CLAUDE.md)
         for ctx_file in self._context_files:
             parts.append(
-                f"<context-file path=\"{ctx_file.path}\">\n{ctx_file.content}\n</context-file>"
+                f'<context-file path="{ctx_file.path}">\n{ctx_file.content}\n</context-file>'
             )
 
         # Skills prompt (apply description budget)
@@ -534,7 +529,10 @@ class AgentRunner:
                 "type": "function",
                 "function": {
                     "name": "execute",
-                    "description": "Execute a shell command and return the output. Use this to run scripts, CLI tools, or any shell command.",
+                    "description": (
+                        "Execute a shell command and return the output."
+                        " Use this to run scripts, CLI tools, or any shell command."
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -555,7 +553,11 @@ class AgentRunner:
                 "type": "function",
                 "function": {
                     "name": "execute_script",
-                    "description": "Execute a multi-line shell script. Use this for complex operations that require multiple commands.",
+                    "description": (
+                        "Execute a multi-line shell script."
+                        " Use this for complex operations"
+                        " that require multiple commands."
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -576,7 +578,12 @@ class AgentRunner:
                 "type": "function",
                 "function": {
                     "name": "write",
-                    "description": "Write content to a file. Creates parent directories automatically. Use this instead of heredoc/cat for writing files.",
+                    "description": (
+                        "Write content to a file."
+                        " Creates parent directories automatically."
+                        " Use this instead of heredoc/cat"
+                        " for writing files."
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -614,40 +621,41 @@ class AgentRunner:
 
         # Add skill tool for on-demand skill loading
         visible_skills = [
-            s for s in self.skills
-            if not s.metadata.invocation.disable_model_invocation
+            s for s in self.skills if not s.metadata.invocation.disable_model_invocation
         ]
         if visible_skills:
             skill_names = [s.name for s in visible_skills]
-            tools.append({
-                "type": "function",
-                "function": {
-                    "name": "skill",
-                    "description": (
-                        "Load and execute a skill by name. Skills provide "
-                        "specialized capabilities and detailed instructions. "
-                        "Call this when the user's request matches a skill's "
-                        "description to get the full skill content."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": (
-                                    "The skill name to invoke. Available: "
-                                    + ", ".join(skill_names)
-                                ),
+            tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "skill",
+                        "description": (
+                            "Load and execute a skill by name. Skills provide "
+                            "specialized capabilities and detailed instructions. "
+                            "Call this when the user's request matches a skill's "
+                            "description to get the full skill content."
+                        ),
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": (
+                                        "The skill name to invoke. Available: "
+                                        + ", ".join(skill_names)
+                                    ),
+                                },
+                                "arguments": {
+                                    "type": "string",
+                                    "description": "Optional arguments to pass to the skill",
+                                },
                             },
-                            "arguments": {
-                                "type": "string",
-                                "description": "Optional arguments to pass to the skill",
-                            },
+                            "required": ["name"],
                         },
-                        "required": ["name"],
                     },
-                },
-            })
+                }
+            )
 
         # Generate tools from skill actions
         for skill in self.skills:
@@ -673,30 +681,34 @@ class AgentRunner:
                     properties[param.name] = prop
                     if param.required:
                         required.append(param.name)
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool_name,
-                        "description": action.description or f"{skill.name} {action.name}",
-                        "parameters": {
-                            "type": "object",
-                            "properties": properties,
-                            "required": required,
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "description": action.description or f"{skill.name} {action.name}",
+                            "parameters": {
+                                "type": "object",
+                                "properties": properties,
+                                "required": required,
+                            },
                         },
-                    },
-                })
+                    }
+                )
 
         # Append extension-registered tools
         if self.engine.extensions:
             for tool_info in self.engine.extensions.get_tools():
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool_info.name,
-                        "description": tool_info.description,
-                        "parameters": tool_info.parameters,
-                    },
-                })
+                tools.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": tool_info.name,
+                            "description": tool_info.description,
+                            "parameters": tool_info.parameters,
+                        },
+                    }
+                )
 
         return tools
 
@@ -713,10 +725,12 @@ class AgentRunner:
                 parts.append({"type": "text", "text": block.text})
             elif isinstance(block, ImageContent):
                 data_url = f"data:{block.mime_type};base64,{block.data}"
-                parts.append({
-                    "type": "image_url",
-                    "image_url": {"url": data_url},
-                })
+                parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": data_url},
+                    }
+                )
         return parts if parts else ""
 
     def _format_messages(
@@ -728,68 +742,68 @@ class AgentRunner:
 
         # Check if current model supports vision
         model_def = self.model_definition
-        supports_vision = model_def is not None and "image" in (
-            model_def.input_modalities or []
-        )
+        supports_vision = model_def is not None and "image" in (model_def.input_modalities or [])
 
         # Add system prompt
         system_prompt = self.build_system_prompt()
         if system_prompt:
-            formatted.append({
-                "role": "system",
-                "content": system_prompt,
-            })
+            formatted.append(
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                }
+            )
 
         # Add conversation messages
         for msg in messages:
             if msg.role == "tool":
-                content = (
-                    msg.text_content
-                    if not isinstance(msg.content, str)
-                    else msg.content
+                content = msg.text_content if not isinstance(msg.content, str) else msg.content
+                formatted.append(
+                    {
+                        "role": "tool",
+                        "content": content,
+                        "tool_call_id": msg.tool_call_id,
+                    }
                 )
-                formatted.append({
-                    "role": "tool",
-                    "content": content,
-                    "tool_call_id": msg.tool_call_id,
-                })
             elif msg.tool_calls:
                 content = (
                     (msg.text_content or None)
                     if not isinstance(msg.content, str)
                     else (msg.content or None)
                 )
-                formatted.append({
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": [
-                        {
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": {
-                                "name": tc["name"],
-                                "arguments": tc["arguments"],
-                            },
-                        }
-                        for tc in msg.tool_calls
-                    ],
-                })
+                formatted.append(
+                    {
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tc["name"],
+                                    "arguments": tc["arguments"],
+                                },
+                            }
+                            for tc in msg.tool_calls
+                        ],
+                    }
+                )
             elif msg.has_images and supports_vision:
                 # Multi-modal message with images
-                formatted.append({
-                    "role": msg.role,
-                    "content": self._format_content_for_openai(msg.content),
-                })
-            else:
-                content = (
-                    msg.text_content
-                    if not isinstance(msg.content, str)
-                    else msg.content
+                formatted.append(
+                    {
+                        "role": msg.role,
+                        "content": self._format_content_for_openai(msg.content),
+                    }
                 )
-                formatted.append({
-                    "role": msg.role,
-                    "content": content,
-                })
+            else:
+                content = msg.text_content if not isinstance(msg.content, str) else msg.content
+                formatted.append(
+                    {
+                        "role": msg.role,
+                        "content": content,
+                    }
+                )
 
         return formatted
 
@@ -887,11 +901,13 @@ class AgentRunner:
         tool_calls = []
         if choice.message.tool_calls:
             for tc in choice.message.tool_calls:
-                tool_calls.append({
-                    "id": tc.id,
-                    "name": tc.function.name,
-                    "arguments": tc.function.arguments,
-                })
+                tool_calls.append(
+                    {
+                        "id": tc.id,
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    }
+                )
 
         # Extract token usage
         token_usage = TokenUsage(
@@ -947,7 +963,10 @@ class AgentRunner:
             cwd = args.get("cwd")
             with self.engine.env_context():
                 result = await self.engine.execute(
-                    command, cwd=cwd, on_output=on_output, abort_signal=abort,
+                    command,
+                    cwd=cwd,
+                    on_output=on_output,
+                    abort_signal=abort,
                 )
             if result.success:
                 return result.output or "(no output)"
@@ -958,7 +977,10 @@ class AgentRunner:
             cwd = args.get("cwd")
             with self.engine.env_context():
                 result = await self.engine.execute_script(
-                    script, cwd=cwd, on_output=on_output, abort_signal=abort,
+                    script,
+                    cwd=cwd,
+                    on_output=on_output,
+                    abort_signal=abort,
                 )
             if result.success:
                 return result.output or "(no output)"
@@ -1019,10 +1041,7 @@ class AgentRunner:
                 # Prepend allowed-tools hint if restricted
                 if skill.allowed_tools:
                     tools_hint = ", ".join(skill.allowed_tools)
-                    content = (
-                        f"[Allowed tools for this skill: {tools_hint}]\n\n"
-                        + content
-                    )
+                    content = f"[Allowed tools for this skill: {tools_hint}]\n\n" + content
 
                 return content
             finally:
@@ -1145,7 +1164,9 @@ class AgentRunner:
             try:
                 timeout = min(self.engine.config.default_timeout_seconds, 30.0)
                 result = await self.engine.execute(cmd, timeout=timeout)
-                replacement = result.output.strip() if result.success else f"[Error: {result.error}]"
+                replacement = (
+                    result.output.strip() if result.success else f"[Error: {result.error}]"
+                )
             except Exception as e:
                 logger.warning("Dynamic content injection failed for: %s — %s", cmd, e)
                 replacement = f"[Error: {e}]"
@@ -1195,10 +1216,7 @@ class AgentRunner:
 
             def _filtered_get_tools() -> list[dict[str, Any]]:
                 all_tools = original_get_tools()
-                return [
-                    t for t in all_tools
-                    if t["function"]["name"] in allowed
-                ]
+                return [t for t in all_tools if t["function"]["name"] in allowed]
 
             child.get_tools = _filtered_get_tools  # type: ignore[assignment]
 
@@ -1220,15 +1238,11 @@ class AgentRunner:
         if len(skill.name) > 64:
             errors.append(f"Name too long ({len(skill.name)} > 64 chars)")
         if not re.match(r"^[a-z0-9][a-z0-9-]*$", skill.name):
-            errors.append(
-                f"Name must be lowercase alphanumeric with hyphens: '{skill.name}'"
-            )
+            errors.append(f"Name must be lowercase alphanumeric with hyphens: '{skill.name}'")
         if not skill.description:
             errors.append("Description is required")
         elif len(skill.description) > 1024:
-            errors.append(
-                f"Description too long ({len(skill.description)} > 1024 chars)"
-            )
+            errors.append(f"Description too long ({len(skill.description)} > 1024 chars)")
         return errors
 
     def _check_skill_invocation(self, user_input: str) -> Skill | None:
@@ -1294,7 +1308,7 @@ class AgentRunner:
 
             skill_context = (
                 f"[User invoked skill: /{invoked_skill.name}]\n\n"
-                f"<skill-content name=\"{invoked_skill.name}\">\n"
+                f'<skill-content name="{invoked_skill.name}">\n'
                 f"{skill_content}\n"
                 f"</skill-content>\n\n"
                 f"User input: {user_input}"
@@ -1325,9 +1339,7 @@ class AgentRunner:
                 # --- steering check ---
                 steering = self._drain_steering()
                 if steering:
-                    self._conversation.append(
-                        AgentMessage(role="user", content=steering)
-                    )
+                    self._conversation.append(AgentMessage(role="user", content=steering))
 
                 # --- turn_start event ---
                 await self.events.emit(
@@ -1383,9 +1395,7 @@ class AgentRunner:
                     # --- steering check between tools ---
                     steering = self._drain_steering()
                     if steering:
-                        self._conversation.append(
-                            AgentMessage(role="user", content=steering)
-                        )
+                        self._conversation.append(AgentMessage(role="user", content=steering))
                         steered = True
                         break  # Stop executing remaining tools, start new turn
 
@@ -1512,10 +1522,13 @@ class AgentRunner:
                 AGENT_END,
                 AgentEndEvent(
                     user_input=user_input,
-                    total_turns=len([
-                        m for m in self._conversation
-                        if m.role == "assistant" and m not in (self._conversation[:1])
-                    ]),
+                    total_turns=len(
+                        [
+                            m
+                            for m in self._conversation
+                            if m.role == "assistant" and m not in (self._conversation[:1])
+                        ]
+                    ),
                     finish_reason=finish_reason,
                     error=error_msg,
                     messages=list(self._conversation),
@@ -1713,7 +1726,7 @@ class AgentRunner:
 
             skill_context = (
                 f"[User invoked skill: /{invoked_skill.name}]\n\n"
-                f"<skill-content name=\"{invoked_skill.name}\">\n"
+                f'<skill-content name="{invoked_skill.name}">\n'
                 f"{skill_content}\n"
                 f"</skill-content>\n\n"
                 f"User input: {user_input}"
@@ -1743,9 +1756,7 @@ class AgentRunner:
                 # --- steering check ---
                 steering = self._drain_steering()
                 if steering:
-                    self._conversation.append(
-                        AgentMessage(role="user", content=steering)
-                    )
+                    self._conversation.append(AgentMessage(role="user", content=steering))
 
                 yield StreamEvent(type="turn_start", turn=turn)
 
@@ -1797,11 +1808,13 @@ class AgentRunner:
                     elif event.type == "tool_call_end":
                         for _idx, tc in tc_collector.items():
                             if tc["id"] == event.tool_call_id:
-                                tool_calls.append({
-                                    "id": tc["id"],
-                                    "name": tc["name"],
-                                    "arguments": tc["args"],
-                                })
+                                tool_calls.append(
+                                    {
+                                        "id": tc["id"],
+                                        "name": tc["name"],
+                                        "arguments": tc["args"],
+                                    }
+                                )
                                 break
 
                 # Build and store AgentMessage
@@ -1850,9 +1863,7 @@ class AgentRunner:
                     # --- steering check between tools ---
                     steering = self._drain_steering()
                     if steering:
-                        self._conversation.append(
-                            AgentMessage(role="user", content=steering)
-                        )
+                        self._conversation.append(AgentMessage(role="user", content=steering))
                         steered = True
                         break
 
@@ -1868,8 +1879,10 @@ class AgentRunner:
                     btc_results = await self.events.emit(
                         BEFORE_TOOL_CALL,
                         BeforeToolCallEvent(
-                            tool_call_id=tc_id, tool_name=tc_name,
-                            args=tc_args, turn=turn,
+                            tool_call_id=tc_id,
+                            tool_name=tc_name,
+                            args=tc_args,
+                            turn=turn,
                         ),
                     )
 
@@ -1879,14 +1892,18 @@ class AgentRunner:
                             if r.block:
                                 blocked = True
                                 block_reason = r.reason or "Blocked by event handler"
-                                self._conversation.append(AgentMessage(
-                                    role="tool",
-                                    content=f"[Blocked] {block_reason}",
-                                    tool_call_id=tc_id, name=tc_name,
-                                ))
+                                self._conversation.append(
+                                    AgentMessage(
+                                        role="tool",
+                                        content=f"[Blocked] {block_reason}",
+                                        tool_call_id=tc_id,
+                                        name=tc_name,
+                                    )
+                                )
                                 yield StreamEvent(
                                     type="tool_result",
-                                    tool_call_id=tc_id, tool_name=tc_name,
+                                    tool_call_id=tc_id,
+                                    tool_name=tc_name,
                                     content=f"[Blocked] {block_reason}",
                                     turn=turn,
                                 )
@@ -1926,23 +1943,32 @@ class AgentRunner:
                     atr_results = await self.events.emit(
                         AFTER_TOOL_RESULT,
                         AfterToolResultEvent(
-                            tool_call_id=tc_id, tool_name=tc_name,
-                            args=tc_args, result=result, turn=turn,
+                            tool_call_id=tc_id,
+                            tool_name=tc_name,
+                            args=tc_args,
+                            result=result,
+                            turn=turn,
                         ),
                     )
                     for r in atr_results:
                         if isinstance(r, ToolResultEventResult) and r.modified_result is not None:
                             result = r.modified_result
 
-                    self._conversation.append(AgentMessage(
-                        role="tool", content=result,
-                        tool_call_id=tc_id, name=tc_name,
-                    ))
+                    self._conversation.append(
+                        AgentMessage(
+                            role="tool",
+                            content=result,
+                            tool_call_id=tc_id,
+                            name=tc_name,
+                        )
+                    )
 
                     yield StreamEvent(
                         type="tool_result",
-                        tool_call_id=tc_id, tool_name=tc_name,
-                        content=result, turn=turn,
+                        tool_call_id=tc_id,
+                        tool_name=tc_name,
+                        content=result,
+                        turn=turn,
                     )
 
                 if steered:
@@ -1967,10 +1993,13 @@ class AgentRunner:
                 AGENT_END,
                 AgentEndEvent(
                     user_input=user_input,
-                    total_turns=len([
-                        m for m in self._conversation
-                        if m.role == "assistant" and m not in (self._conversation[:1])
-                    ]),
+                    total_turns=len(
+                        [
+                            m
+                            for m in self._conversation
+                            if m.role == "assistant" and m not in (self._conversation[:1])
+                        ]
+                    ),
                     finish_reason=finish_reason,
                     error=error_msg,
                     messages=list(self._conversation),

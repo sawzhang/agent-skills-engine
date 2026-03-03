@@ -154,7 +154,8 @@ class OverlayManager:
             # Draw top border
             if top > 0 and top - 1 < height:
                 border_top = " " * left_pad + style(
-                    "\u250c" + "\u2500" * (box_width - 2) + "\u2510", dim=True,
+                    "\u250c" + "\u2500" * (box_width - 2) + "\u2510",
+                    dim=True,
                 )
                 result[top - 1] = border_top
 
@@ -166,7 +167,10 @@ class OverlayManager:
                     padded_line = (
                         " " * left_pad
                         + style("\u2502", dim=True)
-                        + " " + line + " " * max(0, inner_pad) + " "
+                        + " "
+                        + line
+                        + " " * max(0, inner_pad)
+                        + " "
                         + style("\u2502", dim=True)
                     )
                     result[row] = padded_line
@@ -175,7 +179,8 @@ class OverlayManager:
             bottom_row = top + overlay_height
             if 0 <= bottom_row < height:
                 border_bottom = " " * left_pad + style(
-                    "\u2514" + "\u2500" * (box_width - 2) + "\u2518", dim=True,
+                    "\u2514" + "\u2500" * (box_width - 2) + "\u2518",
+                    dim=True,
                 )
                 result[bottom_row] = border_bottom
 
@@ -189,4 +194,5 @@ class OverlayManager:
     def _strip_ansi(text: str) -> str:
         """Remove ANSI escape sequences from *text* for length measurement."""
         import re
+
         return re.sub(r"\033\[[^m]*m", "", text)

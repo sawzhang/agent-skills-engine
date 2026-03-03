@@ -253,6 +253,7 @@ class LLMAdapter(ABC):
             tc_args = tc.get("arguments", "")
             if isinstance(tc_args, dict):
                 import json
+
                 tc_args = json.dumps(tc_args)
             yield StreamEvent(
                 type="tool_call_start",

@@ -170,33 +170,23 @@ def main() -> None:
 
     # Chat command (interactive or mode-based)
     chat_parser = subparsers.add_parser("chat", help="Start interactive chat or run in a mode")
-    chat_parser.add_argument(
-        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
-    )
+    chat_parser.add_argument("-d", "--dir", action="append", dest="dirs", help="Skill directories")
     chat_parser.add_argument(
         "--mode",
         choices=["interactive", "json", "rpc"],
         default="interactive",
         help="Execution mode (default: interactive)",
     )
-    chat_parser.add_argument(
-        "--model", default=None, help="Model to use"
-    )
+    chat_parser.add_argument("--model", default=None, help="Model to use")
     chat_parser.add_argument(
         "prompt_text", nargs="?", default=None, help="Prompt text (for json mode)"
     )
 
     # Serve command (web UI)
     serve_parser = subparsers.add_parser("serve", help="Start the web UI server")
-    serve_parser.add_argument(
-        "-d", "--dir", action="append", dest="dirs", help="Skill directories"
-    )
-    serve_parser.add_argument(
-        "--host", default="127.0.0.1", help="Host to bind to"
-    )
-    serve_parser.add_argument(
-        "--port", type=int, default=8080, help="Port to bind to"
-    )
+    serve_parser.add_argument("-d", "--dir", action="append", dest="dirs", help="Skill directories")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
+    serve_parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
 
     args = parser.parse_args()
 
@@ -592,9 +582,7 @@ def _prompts_list() -> None:
 
     if not templates:
         console.print("[dim]No prompt templates found.[/dim]")
-        console.print(
-            "[dim]Place .md files in ~/.skillkit/prompts/ or ./.skillkit/prompts/[/dim]"
-        )
+        console.print("[dim]Place .md files in ~/.skillkit/prompts/ or ./.skillkit/prompts/[/dim]")
         return
 
     table = Table(title="Prompt Templates")
@@ -724,14 +712,11 @@ def cmd_serve(args: argparse.Namespace) -> None:
     try:
         from skillkit.web.server import run_server
 
-        console.print(
-            f"[green]Starting web UI at http://{args.host}:{args.port}[/green]"
-        )
+        console.print(f"[green]Starting web UI at http://{args.host}:{args.port}[/green]")
         run_server(agent=agent, host=args.host, port=args.port)
     except ImportError:
         console.print(
-            "[red]Web UI requires the 'web' extra. "
-            "Install with: pip install skillkit[web][/red]"
+            "[red]Web UI requires the 'web' extra. Install with: pip install skillkit[web][/red]"
         )
         sys.exit(1)
 

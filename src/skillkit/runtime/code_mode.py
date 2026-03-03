@@ -399,9 +399,7 @@ class CodeModeRuntime(SkillRuntime):
                 code, mode, cwd, env, timeout, on_output, abort_signal
             )
         else:
-            return await self._run_inprocess(
-                code, mode, timeout, on_output, abort_signal
-            )
+            return await self._run_inprocess(code, mode, timeout, on_output, abort_signal)
 
     async def _run_inprocess(
         self,
@@ -569,9 +567,7 @@ if result is not _UNSET:
             if on_output is None and abort_signal is None:
                 return await self._collect_simple(process, timer, timeout)
 
-            return await self._collect_streaming(
-                process, timer, timeout, on_output, abort_signal
-            )
+            return await self._collect_streaming(process, timer, timeout, on_output, abort_signal)
 
         except Exception as e:
             return ExecutionResult.error_result(

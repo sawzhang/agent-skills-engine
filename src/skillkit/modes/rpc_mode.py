@@ -1,4 +1,5 @@
 """RPC mode: JSON-line stdin/stdout protocol for programmatic control."""
+
 from __future__ import annotations
 
 import asyncio
@@ -116,58 +117,42 @@ class RpcMode:
                         self._send_event(event)
                 finally:
                     self._is_streaming = False
-                self._send_response(
-                    RpcResponse(id=cmd_id, command="prompt", success=True)
-                )
+                self._send_response(RpcResponse(id=cmd_id, command="prompt", success=True))
 
             elif cmd_type == "steer":
                 message = cmd.get("message", "")
                 if self._agent and message:
                     self._agent.steer(message)
-                self._send_response(
-                    RpcResponse(id=cmd_id, command="steer", success=True)
-                )
+                self._send_response(RpcResponse(id=cmd_id, command="steer", success=True))
 
             elif cmd_type == "follow_up":
                 message = cmd.get("message", "")
                 if self._agent and message:
                     self._agent.follow_up(message)
-                self._send_response(
-                    RpcResponse(id=cmd_id, command="follow_up", success=True)
-                )
+                self._send_response(RpcResponse(id=cmd_id, command="follow_up", success=True))
 
             elif cmd_type == "abort":
                 if self._agent:
                     self._agent.abort()
-                self._send_response(
-                    RpcResponse(id=cmd_id, command="abort", success=True)
-                )
+                self._send_response(RpcResponse(id=cmd_id, command="abort", success=True))
 
             elif cmd_type == "new_session":
                 if self._agent:
                     self._agent.clear_history()
                     self._agent.reset_abort()
-                self._send_response(
-                    RpcResponse(id=cmd_id, command="new_session", success=True)
-                )
+                self._send_response(RpcResponse(id=cmd_id, command="new_session", success=True))
 
             elif cmd_type == "get_state":
                 state = {
                     "model": self._agent.config.model if self._agent else "",
                     "thinking_level": (
-                        self._agent.config.thinking_level or "off"
-                        if self._agent
-                        else "off"
+                        self._agent.config.thinking_level or "off" if self._agent else "off"
                     ),
                     "is_streaming": self._is_streaming,
-                    "message_count": (
-                        len(self._agent.get_history()) if self._agent else 0
-                    ),
+                    "message_count": (len(self._agent.get_history()) if self._agent else 0),
                 }
                 self._send_response(
-                    RpcResponse(
-                        id=cmd_id, command="get_state", success=True, data=state
-                    )
+                    RpcResponse(id=cmd_id, command="get_state", success=True, data=state)
                 )
 
             elif cmd_type == "set_model":
@@ -177,18 +162,14 @@ class RpcMode:
                     provider = cmd.get("provider")
                     if provider:
                         self._agent.set_adapter(provider)
-                self._send_response(
-                    RpcResponse(id=cmd_id, command="set_model", success=True)
-                )
+                self._send_response(RpcResponse(id=cmd_id, command="set_model", success=True))
 
             elif cmd_type == "set_thinking_level":
                 level = cmd.get("level", "off")
                 if self._agent:
                     self._agent.config.thinking_level = level
                 self._send_response(
-                    RpcResponse(
-                        id=cmd_id, command="set_thinking_level", success=True
-                    )
+                    RpcResponse(id=cmd_id, command="set_thinking_level", success=True)
                 )
 
             elif cmd_type == "get_messages":
@@ -223,9 +204,7 @@ class RpcMode:
 
         except Exception as e:
             self._send_response(
-                RpcResponse(
-                    id=cmd_id, command=cmd_type, success=False, error=str(e)
-                )
+                RpcResponse(id=cmd_id, command=cmd_type, success=False, error=str(e))
             )
 
     async def run(self, agent: Any) -> None:

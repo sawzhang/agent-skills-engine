@@ -36,6 +36,7 @@ DEFAULT_KEYBINDINGS: dict[str, list[str]] = {
 # Normalised key descriptor parsing
 # ---------------------------------------------------------------------------
 
+
 def _normalise_key_descriptor(descriptor: str) -> str:
     """
     Normalise a human-readable key descriptor to a canonical form.
@@ -95,6 +96,7 @@ def _key_to_descriptor(key: Key) -> str:
 # ---------------------------------------------------------------------------
 # Manager
 # ---------------------------------------------------------------------------
+
 
 class KeybindingsManager:
     """

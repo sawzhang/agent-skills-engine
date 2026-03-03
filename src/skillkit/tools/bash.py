@@ -1,4 +1,5 @@
 """Bash tool - execute shell commands."""
+
 from __future__ import annotations
 
 import asyncio
@@ -43,10 +44,7 @@ class BashTool(BaseTool):
                 },
                 "timeout": {
                     "type": "integer",
-                    "description": (
-                        "Timeout in seconds. "
-                        f"Defaults to {int(_DEFAULT_TIMEOUT)}."
-                    ),
+                    "description": (f"Timeout in seconds. Defaults to {int(_DEFAULT_TIMEOUT)}."),
                 },
             },
             "required": ["command"],

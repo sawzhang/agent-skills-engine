@@ -1,4 +1,5 @@
 """Write tool - create or overwrite files."""
+
 from __future__ import annotations
 
 from pathlib import Path

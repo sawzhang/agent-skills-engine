@@ -1,4 +1,5 @@
 """Execution modes for the skillkit."""
+
 from __future__ import annotations
 
 from skillkit.modes.json_mode import JsonMode

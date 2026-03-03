@@ -1,4 +1,5 @@
 """Package source resolution."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

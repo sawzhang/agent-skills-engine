@@ -50,9 +50,7 @@ async def setup_memory(
     client = OpenVikingClient(config)
     ok = await client.initialize()
     if not ok:
-        logger.warning(
-            "OpenViking unavailable at %s — memory disabled", config.base_url
-        )
+        logger.warning("OpenViking unavailable at %s — memory disabled", config.base_url)
         return None
 
     logger.info("OpenViking connected at %s", config.base_url)

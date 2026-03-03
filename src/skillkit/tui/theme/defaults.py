@@ -31,7 +31,6 @@ DEFAULT_DARK_COLORS: ThemeColor = {
     "warning": "#e0af68",
     "success": "#9ece6a",
     "info": "#7dcfff",
-
     # Message backgrounds
     "message_user_bg": "#1a1b26",
     "message_user_fg": "#c0caf5",
@@ -41,7 +40,6 @@ DEFAULT_DARK_COLORS: ThemeColor = {
     "message_system_fg": "#a9b1d6",
     "message_tool_bg": "#1a1b26",
     "message_tool_fg": "#7dcfff",
-
     # Markdown rendering
     "md_heading1": "#ff9e64",
     "md_heading2": "#7aa2f7",
@@ -57,7 +55,6 @@ DEFAULT_DARK_COLORS: ThemeColor = {
     "md_blockquote": "#565f89",
     "md_list_marker": "#e0af68",
     "md_hr": "#3b4261",
-
     # Syntax highlighting
     "syntax_keyword": "#bb9af7",
     "syntax_string": "#9ece6a",
@@ -69,14 +66,12 @@ DEFAULT_DARK_COLORS: ThemeColor = {
     "syntax_type": "#2ac3de",
     "syntax_constant": "#ff9e64",
     "syntax_punctuation": "#a9b1d6",
-
     # Input widgets
     "input_bg": "#292e42",
     "input_fg": "#c0caf5",
     "input_placeholder": "#565f89",
     "input_cursor": "#c0caf5",
     "input_selection": "#3b4261",
-
     # Component chrome
     "scrollbar_track": "#1a1b26",
     "scrollbar_thumb": "#3b4261",

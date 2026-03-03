@@ -1,4 +1,5 @@
 """Context file (AGENTS.md, CLAUDE.md) discovery and loading."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

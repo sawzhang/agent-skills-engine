@@ -1,4 +1,5 @@
 """Interactive TUI mode for the coding agent."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -43,9 +44,7 @@ class InteractiveMode:
 
         while self._running:
             try:
-                user_input = console.input(
-                    "[bold green]You:[/bold green] "
-                ).strip()
+                user_input = console.input("[bold green]You:[/bold green] ").strip()
             except (EOFError, KeyboardInterrupt):
                 console.print("\n[dim]Goodbye![/dim]")
                 break
@@ -76,38 +75,24 @@ class InteractiveMode:
                 continue
 
             if user_input == "/model":
-                console.print(
-                    f"[dim]Current model: {agent.config.model}[/dim]"
-                )
+                console.print(f"[dim]Current model: {agent.config.model}[/dim]")
                 continue
 
             if user_input == "/skills":
                 for s in agent.skills:
                     emoji = s.metadata.emoji or "\U0001f527"
-                    console.print(
-                        f"  {emoji} {s.name} - {s.description[:60]}"
-                    )
+                    console.print(f"  {emoji} {s.name} - {s.description[:60]}")
                 continue
 
             if user_input == "/history":
                 for msg in agent.get_history():
-                    role_style = (
-                        "green" if msg.role == "user" else "blue"
-                    )
-                    content = (
-                        msg.content[:100] + "..."
-                        if len(msg.content) > 100
-                        else msg.content
-                    )
-                    console.print(
-                        f"[{role_style}]{msg.role}:[/{role_style}] {content}"
-                    )
+                    role_style = "green" if msg.role == "user" else "blue"
+                    content = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
+                    console.print(f"[{role_style}]{msg.role}:[/{role_style}] {content}")
                 continue
 
             # Stream response
-            console.print(
-                "[bold blue]Assistant:[/bold blue] ", end=""
-            )
+            console.print("[bold blue]Assistant:[/bold blue] ", end="")
             full_response = ""
             thinking = ""
 
@@ -116,9 +101,7 @@ class InteractiveMode:
                     if event.type == "thinking_delta":
                         thinking += event.content
                     elif event.type == "text_delta":
-                        console.print(
-                            event.content, end="", highlight=False
-                        )
+                        console.print(event.content, end="", highlight=False)
                         full_response += event.content
                     elif event.type == "tool_call_start":
                         console.print(
@@ -129,15 +112,10 @@ class InteractiveMode:
                         result_preview = event.content[:200]
                         console.print(f"\n[dim]{result_preview}[/dim]")
                     elif event.type == "error":
-                        console.print(
-                            f"\n[red]Error: {event.error}[/red]"
-                        )
+                        console.print(f"\n[red]Error: {event.error}[/red]")
 
                 if thinking:
-                    console.print(
-                        f"\n[dim italic]Thinking: {thinking[:200]}..."
-                        "[/dim italic]"
-                    )
+                    console.print(f"\n[dim italic]Thinking: {thinking[:200]}...[/dim italic]")
                 console.print()  # newline after response
 
             except Exception as e:

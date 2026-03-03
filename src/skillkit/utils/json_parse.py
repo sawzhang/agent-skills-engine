@@ -1,4 +1,5 @@
 """Streaming partial JSON parser for tool call arguments."""
+
 from __future__ import annotations
 
 import json

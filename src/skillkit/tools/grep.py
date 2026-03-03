@@ -1,4 +1,5 @@
 """Grep tool - search file contents with regex."""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,8 +47,7 @@ class GrepTool(BaseTool):
                 "path": {
                     "type": "string",
                     "description": (
-                        "File or directory to search in. "
-                        "Defaults to current working directory."
+                        "File or directory to search in. Defaults to current working directory."
                     ),
                 },
                 "glob": {
@@ -100,14 +100,23 @@ class GrepTool(BaseTool):
         rg_path = shutil.which("rg")
         if rg_path:
             return await self._search_ripgrep(
-                rg_path, pattern, search_path, glob_filter,
-                case_insensitive, context_lines, limit,
+                rg_path,
+                pattern,
+                search_path,
+                glob_filter,
+                case_insensitive,
+                context_lines,
+                limit,
             )
 
         # Fall back to Python regex
         return self._search_python(
-            pattern, search_path, glob_filter,
-            case_insensitive, context_lines, limit,
+            pattern,
+            search_path,
+            glob_filter,
+            case_insensitive,
+            context_lines,
+            limit,
         )
 
     async def _search_ripgrep(
@@ -145,15 +154,20 @@ class GrepTool(BaseTool):
                 cwd=self.cwd,
             )
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=30.0,
+                process.communicate(),
+                timeout=30.0,
             )
         except asyncio.TimeoutError:
             return "Error: search timed out after 30s."
         except Exception as e:
             logger.warning("ripgrep failed, falling back to Python: %s", e)
             return self._search_python(
-                pattern, search_path, glob_filter,
-                case_insensitive, context_lines, limit,
+                pattern,
+                search_path,
+                glob_filter,
+                case_insensitive,
+                context_lines,
+                limit,
             )
 
         if process.returncode == 1:
@@ -229,9 +243,7 @@ class GrepTool(BaseTool):
                     end = min(len(lines), line_no + context_lines)
                     for ctx_no in range(start, end):
                         prefix = ">" if ctx_no == line_no - 1 else " "
-                        results.append(
-                            f"{rel_path}:{ctx_no + 1}:{prefix}{lines[ctx_no]}"
-                        )
+                        results.append(f"{rel_path}:{ctx_no + 1}:{prefix}{lines[ctx_no]}")
                     results.append("--")
                 else:
                     results.append(f"{rel_path}:{line_no}:{line}")
@@ -257,9 +269,19 @@ class GrepTool(BaseTool):
 
         # Default: search all files recursively, skipping common non-text dirs
         skip_dirs = {
-            ".git", "node_modules", "__pycache__", ".venv", "venv",
-            ".tox", ".mypy_cache", ".pytest_cache", "dist", "build",
-            ".next", ".nuxt", "coverage",
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            ".tox",
+            ".mypy_cache",
+            ".pytest_cache",
+            "dist",
+            "build",
+            ".next",
+            ".nuxt",
+            "coverage",
         }
         files: list[Path] = []
         for item in sorted(search_path.rglob("*")):

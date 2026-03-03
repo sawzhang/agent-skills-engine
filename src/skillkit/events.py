@@ -337,9 +337,7 @@ class EventBus:
                 ...
         """
         if handler is not None:
-            entry = _HandlerEntry(
-                event=event, handler=handler, priority=priority, source=source
-            )
+            entry = _HandlerEntry(event=event, handler=handler, priority=priority, source=source)
             self._handlers.append(entry)
 
             def unsubscribe() -> None:

@@ -97,7 +97,9 @@ class AdapterRegistry:
             logger.debug("Overriding adapter: %s", name)
 
         self._entries[name] = _AdapterEntry(
-            name=name, instance=adapter, source=source,
+            name=name,
+            instance=adapter,
+            source=source,
         )
         logger.debug("Registered adapter: %s (source=%s)", name, source or "manual")
 
@@ -132,7 +134,9 @@ class AdapterRegistry:
             logger.debug("Overriding adapter factory: %s", name)
 
         self._entries[name] = _AdapterEntry(
-            name=name, factory=factory, source=source,
+            name=name,
+            factory=factory,
+            source=source,
         )
         logger.debug("Registered adapter factory: %s (source=%s)", name, source or "manual")
 
@@ -160,9 +164,7 @@ class AdapterRegistry:
         entry = self._entries.get(name)
         if entry is None:
             available = ", ".join(self._entries.keys()) or "(none)"
-            raise KeyError(
-                f"Adapter '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"Adapter '{name}' not found. Available: {available}")
 
         if entry.instance is not None:
             return entry.instance
@@ -170,9 +172,7 @@ class AdapterRegistry:
         # Lazy factory creation
         if entry.factory is not None:
             if engine is None:
-                raise RuntimeError(
-                    f"Adapter '{name}' requires a SkillsEngine for factory creation"
-                )
+                raise RuntimeError(f"Adapter '{name}' requires a SkillsEngine for factory creation")
             logger.debug("Creating adapter '%s' from factory", name)
             entry.instance = entry.factory(engine)
             return entry.instance
@@ -210,9 +210,7 @@ class AdapterRegistry:
         """
         if name not in self._entries:
             available = ", ".join(self._entries.keys()) or "(none)"
-            raise KeyError(
-                f"Adapter '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"Adapter '{name}' not found. Available: {available}")
         self._default_name = name
         logger.debug("Default adapter set to: %s", name)
 
@@ -248,10 +246,7 @@ class AdapterRegistry:
         Returns:
             Number of adapters removed
         """
-        to_remove = [
-            name for name, entry in self._entries.items()
-            if entry.source == source
-        ]
+        to_remove = [name for name, entry in self._entries.items() if entry.source == source]
         for name in to_remove:
             self.unregister(name)
         return len(to_remove)
@@ -266,10 +261,7 @@ class AdapterRegistry:
 
     def list_by_source(self, source: str) -> list[str]:
         """List adapter names registered by a given source."""
-        return [
-            name for name, entry in self._entries.items()
-            if entry.source == source
-        ]
+        return [name for name, entry in self._entries.items() if entry.source == source]
 
     def get_info(self, name: str) -> dict[str, Any]:
         """

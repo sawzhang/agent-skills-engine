@@ -1,4 +1,5 @@
 """JSON mode: outputs stream events as JSONL to stdout."""
+
 from __future__ import annotations
 
 import json

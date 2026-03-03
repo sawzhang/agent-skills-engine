@@ -1,4 +1,5 @@
 """Edit tool - exact string replacement in files."""
+
 from __future__ import annotations
 
 import difflib
@@ -116,7 +117,10 @@ class EditTool(BaseTool):
 
         replaced_word = "replacements" if count > 1 else "replacement"
         logger.debug(
-            "Edited %s: %d %s", resolved, count, replaced_word,
+            "Edited %s: %d %s",
+            resolved,
+            count,
+            replaced_word,
         )
         return f"Edited {resolved} ({count} {replaced_word})\n\n{diff}"
 

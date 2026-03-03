@@ -140,8 +140,7 @@ class SelectList(Component):
         else:
             query = self._filter_text.lower()
             self._filtered_items = [
-                item for item in self._items
-                if _fuzzy_match(query, item.label.lower())
+                item for item in self._items if _fuzzy_match(query, item.label.lower())
             ]
         self._selected_index = 0
         self._scroll_offset = 0
@@ -178,7 +177,7 @@ class SelectList(Component):
             self._scroll_offset = self._selected_index - display_count + 1
         self._scroll_offset = max(0, min(self._scroll_offset, len(visible) - display_count))
 
-        window = visible[self._scroll_offset:self._scroll_offset + display_count]
+        window = visible[self._scroll_offset : self._scroll_offset + display_count]
 
         for i, item in enumerate(window):
             abs_idx = self._scroll_offset + i
@@ -191,7 +190,7 @@ class SelectList(Component):
             # Truncate to fit width
             content = f" {marker} {label}{desc}"
             if len(content) > width:
-                content = content[:width - 1] + "\u2026"
+                content = content[: width - 1] + "\u2026"
 
             if is_selected:
                 lines.append(style(content, bold=True, underline=True))
@@ -200,8 +199,10 @@ class SelectList(Component):
 
         # Scroll indicators
         if self._scroll_offset > 0:
-            lines.insert(len(lines) - display_count if self._filterable else 0,
-                         style("  \u25b2 more above", dim=True))
+            lines.insert(
+                len(lines) - display_count if self._filterable else 0,
+                style("  \u25b2 more above", dim=True),
+            )
         if self._scroll_offset + display_count < len(visible):
             lines.append(style("  \u25bc more below", dim=True))
 
@@ -287,6 +288,7 @@ class SelectList(Component):
 # ---------------------------------------------------------------------------
 # Fuzzy matching helper
 # ---------------------------------------------------------------------------
+
 
 def _fuzzy_match(query: str, text: str) -> bool:
     """

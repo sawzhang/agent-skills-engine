@@ -1,4 +1,5 @@
 """Tool registry for managing built-in and custom tools."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

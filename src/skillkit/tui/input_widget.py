@@ -117,12 +117,12 @@ class InputWidget(Component):
         start = 0
         if cursor > available - 1:
             start = cursor - available + 1
-        visible = text[start:start + available]
+        visible = text[start : start + available]
         cursor_in_view = cursor - start
 
         # Build the line with cursor highlighting
         before = visible[:cursor_in_view]
-        after = visible[cursor_in_view + 1:] if cursor_in_view < len(visible) else ""
+        after = visible[cursor_in_view + 1 :] if cursor_in_view < len(visible) else ""
         cursor_char = visible[cursor_in_view] if cursor_in_view < len(visible) else " "
 
         if self._focused:
@@ -208,19 +208,19 @@ class InputWidget(Component):
 
         # Kill to end of line (Ctrl+K)
         if name == "ctrl+k":
-            killed = "".join(self._buffer[self._cursor:])
+            killed = "".join(self._buffer[self._cursor :])
             if killed:
                 self._kill_ring.append(killed)
-            self._buffer = self._buffer[:self._cursor]
+            self._buffer = self._buffer[: self._cursor]
             self.invalidate()
             return True
 
         # Kill to start of line (Ctrl+U)
         if name == "ctrl+u":
-            killed = "".join(self._buffer[:self._cursor])
+            killed = "".join(self._buffer[: self._cursor])
             if killed:
                 self._kill_ring.append(killed)
-            self._buffer = self._buffer[self._cursor:]
+            self._buffer = self._buffer[self._cursor :]
             self._cursor = 0
             self.invalidate()
             return True
@@ -238,10 +238,10 @@ class InputWidget(Component):
         # Clear line (Ctrl+W - kill word backward)
         if name == "ctrl+w":
             boundary = self._word_boundary_left()
-            killed = "".join(self._buffer[boundary:self._cursor])
+            killed = "".join(self._buffer[boundary : self._cursor])
             if killed:
                 self._kill_ring.append(killed)
-            self._buffer = self._buffer[:boundary] + self._buffer[self._cursor:]
+            self._buffer = self._buffer[:boundary] + self._buffer[self._cursor :]
             self._cursor = boundary
             self.invalidate()
             return True

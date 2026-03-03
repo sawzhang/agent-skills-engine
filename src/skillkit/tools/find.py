@@ -1,4 +1,5 @@
 """Find tool - find files by glob pattern."""
+
 from __future__ import annotations
 
 import asyncio
@@ -44,15 +45,12 @@ class FindTool(BaseTool):
                 "path": {
                     "type": "string",
                     "description": (
-                        "Directory to search in. "
-                        "Defaults to current working directory."
+                        "Directory to search in. Defaults to current working directory."
                     ),
                 },
                 "limit": {
                     "type": "integer",
-                    "description": (
-                        f"Maximum number of results. Defaults to {_DEFAULT_LIMIT}."
-                    ),
+                    "description": (f"Maximum number of results. Defaults to {_DEFAULT_LIMIT}."),
                 },
             },
             "required": ["pattern"],
@@ -111,7 +109,9 @@ class FindTool(BaseTool):
         return result
 
     async def _git_ls_files(
-        self, search_dir: Path, pattern: str,
+        self,
+        search_dir: Path,
+        pattern: str,
     ) -> list[Path] | None:
         """
         Use `git ls-files` to find files respecting .gitignore.
@@ -120,13 +120,18 @@ class FindTool(BaseTool):
         """
         try:
             process = await asyncio.create_subprocess_exec(
-                "git", "ls-files", "--cached", "--others", "--exclude-standard",
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
                 cwd=str(search_dir),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=10.0,
+                process.communicate(),
+                timeout=10.0,
             )
         except (FileNotFoundError, asyncio.TimeoutError):
             return None
@@ -155,9 +160,19 @@ class FindTool(BaseTool):
     def _glob_files(self, search_dir: Path, pattern: str) -> list[Path]:
         """Find files using pathlib glob, skipping common ignored directories."""
         skip_dirs = {
-            ".git", "node_modules", "__pycache__", ".venv", "venv",
-            ".tox", ".mypy_cache", ".pytest_cache", "dist", "build",
-            ".next", ".nuxt", "coverage",
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            ".tox",
+            ".mypy_cache",
+            ".pytest_cache",
+            "dist",
+            "build",
+            ".next",
+            ".nuxt",
+            "coverage",
         }
 
         files: list[Path] = []

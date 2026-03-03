@@ -97,12 +97,7 @@ COMPONENT_KEYS: list[str] = [
 ]
 
 ALL_COLOR_KEYS: list[str] = (
-    CORE_UI_KEYS
-    + MESSAGE_KEYS
-    + MARKDOWN_KEYS
-    + SYNTAX_KEYS
-    + INPUT_KEYS
-    + COMPONENT_KEYS
+    CORE_UI_KEYS + MESSAGE_KEYS + MARKDOWN_KEYS + SYNTAX_KEYS + INPUT_KEYS + COMPONENT_KEYS
 )
 """Complete list of recognised colour keys (~53 keys)."""
 
@@ -118,6 +113,7 @@ ThemeColor = dict[str, str]
 # ---------------------------------------------------------------------------
 # ThemeInfo
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ThemeInfo:

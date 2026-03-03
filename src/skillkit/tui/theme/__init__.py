@@ -1,4 +1,5 @@
 """Theme system for the TUI."""
+
 from __future__ import annotations
 
 from skillkit.tui.theme.defaults import DEFAULT_DARK_THEME, get_default_theme

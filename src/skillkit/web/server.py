@@ -1,4 +1,5 @@
 """Web UI server using Starlette."""
+
 from __future__ import annotations
 
 import json
@@ -13,10 +14,7 @@ try:
     from starlette.staticfiles import StaticFiles
     from starlette.websockets import WebSocket
 except ImportError:
-    raise ImportError(
-        "Web UI requires the 'web' extra. "
-        "Install with: pip install skillkit[web]"
-    )
+    raise ImportError("Web UI requires the 'web' extra. Install with: pip install skillkit[web]")
 
 from skillkit.web.storage import SessionStorage
 
@@ -112,11 +110,13 @@ def create_app(agent: Any = None, storage: SessionStorage | None = None) -> Star
         """Get agent configuration."""
         if not _agent:
             return JSONResponse({"error": "No agent"}, status_code=400)
-        return JSONResponse({
-            "model": _agent.config.model,
-            "thinking_level": _agent.config.thinking_level or "off",
-            "max_turns": _agent.config.max_turns,
-        })
+        return JSONResponse(
+            {
+                "model": _agent.config.model,
+                "thinking_level": _agent.config.thinking_level or "off",
+                "max_turns": _agent.config.max_turns,
+            }
+        )
 
     async def websocket_endpoint(websocket: WebSocket) -> None:
         """WebSocket endpoint for bidirectional communication."""
@@ -184,8 +184,7 @@ def run_server(agent: Any = None, host: str = "127.0.0.1", port: int = 8080) -> 
         import uvicorn
     except ImportError:
         raise ImportError(
-            "Running the web server requires uvicorn. "
-            "Install with: pip install skillkit[web]"
+            "Running the web server requires uvicorn. Install with: pip install skillkit[web]"
         )
 
     app = create_app(agent=agent)

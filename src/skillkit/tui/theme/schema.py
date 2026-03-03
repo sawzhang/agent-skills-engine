@@ -1,4 +1,5 @@
 """Theme JSON schema validation."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -67,8 +68,6 @@ def validate_theme(data: dict[str, Any]) -> list[str]:
         else:
             for key, value in data["variables"].items():
                 if not isinstance(value, str):
-                    errors.append(
-                        f"Variable '{key}' must be a string, got: {type(value).__name__}"
-                    )
+                    errors.append(f"Variable '{key}' must be a string, got: {type(value).__name__}")
 
     return errors

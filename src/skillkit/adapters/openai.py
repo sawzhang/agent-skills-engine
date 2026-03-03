@@ -13,8 +13,7 @@ try:
     from openai import AsyncOpenAI  # type: ignore[import-not-found]
 except ImportError:
     raise ImportError(
-        "OpenAI adapter requires the 'openai' package. "
-        "Install with: pip install skillkit[openai]"
+        "OpenAI adapter requires the 'openai' package. Install with: pip install skillkit[openai]"
     )
 
 from skillkit.adapters.base import AgentResponse, LLMAdapter, Message
@@ -265,7 +264,11 @@ class OpenAIAdapter(LLMAdapter):
                     if idx not in active_tool_calls:
                         # New tool call starting
                         tc_id = tc_delta.id or ""
-                        tc_name = tc_delta.function.name if tc_delta.function and tc_delta.function.name else ""
+                        tc_name = (
+                            tc_delta.function.name
+                            if tc_delta.function and tc_delta.function.name
+                            else ""
+                        )
                         active_tool_calls[idx] = {
                             "id": tc_id,
                             "name": tc_name,

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 # Key data model
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Key:
     """
@@ -128,6 +129,7 @@ _SS3: dict[bytes, Key] = {
 # Modifier bit handling (xterm-style ;N suffixes)
 # ---------------------------------------------------------------------------
 
+
 def _modifier_flags(code: int) -> tuple[bool, bool, bool]:
     """
     Decode an xterm modifier code into ``(shift, alt, ctrl)`` booleans.
@@ -144,6 +146,7 @@ def _modifier_flags(code: int) -> tuple[bool, bool, bool]:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def parse_key(data: bytes) -> Key:
     """
@@ -208,13 +211,13 @@ def parse_key(data: bytes) -> Key:
     # -----------------------------------------------------------------------
     byte = data[0]
 
-    if byte == 0x0d or byte == 0x0a:  # CR or LF
+    if byte == 0x0D or byte == 0x0A:  # CR or LF
         return KEY_ENTER
 
     if byte == 0x09:  # TAB
         return KEY_TAB
 
-    if byte == 0x7f or byte == 0x08:  # DEL or BS
+    if byte == 0x7F or byte == 0x08:  # DEL or BS
         return KEY_BACKSPACE
 
     if byte == 0x00:  # Ctrl+Space / Ctrl+@
@@ -224,13 +227,13 @@ def parse_key(data: bytes) -> Key:
         letter = chr(byte + 96)  # 1 -> 'a', 2 -> 'b', ...
         return Key(name=f"ctrl+{letter}", char=letter, ctrl=True)
 
-    if byte == 0x1c:
+    if byte == 0x1C:
         return Key(name="ctrl+\\", char="\\", ctrl=True)
-    if byte == 0x1d:
+    if byte == 0x1D:
         return Key(name="ctrl+]", char="]", ctrl=True)
-    if byte == 0x1e:
+    if byte == 0x1E:
         return Key(name="ctrl+^", char="^", ctrl=True)
-    if byte == 0x1f:
+    if byte == 0x1F:
         return Key(name="ctrl+_", char="_", ctrl=True)
 
     # -----------------------------------------------------------------------
@@ -252,6 +255,7 @@ def parse_key(data: bytes) -> Key:
 # ---------------------------------------------------------------------------
 # Internal CSI parser
 # ---------------------------------------------------------------------------
+
 
 def _parse_csi(payload: bytes) -> Key:
     """

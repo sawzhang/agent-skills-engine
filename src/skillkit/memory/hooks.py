@@ -67,7 +67,7 @@ class MemoryHooks:
             return
 
         conversation: list[AgentMessage] = self._get_conversation()
-        new_messages = conversation[self._synced_message_count:]
+        new_messages = conversation[self._synced_message_count :]
 
         for msg in new_messages:
             if msg.role in ("user", "assistant") and msg.content:
@@ -87,7 +87,7 @@ class MemoryHooks:
         # Sync any remaining messages
         if self.config.auto_sync:
             conversation: list[AgentMessage] = self._get_conversation()
-            new_messages = conversation[self._synced_message_count:]
+            new_messages = conversation[self._synced_message_count :]
 
             for msg in new_messages:
                 if msg.role in ("user", "assistant") and msg.content:

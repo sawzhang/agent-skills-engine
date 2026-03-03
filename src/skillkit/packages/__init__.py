@@ -1,4 +1,5 @@
 """Package management for skills, extensions, themes, and prompts."""
+
 from __future__ import annotations
 
 from skillkit.packages.manager import PackageManager

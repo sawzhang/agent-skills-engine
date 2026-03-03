@@ -172,7 +172,7 @@ class EditorWidget(Component):
         self._scroll_offset = max(0, min(self._scroll_offset, len(wrapped) - display_height))
 
         # Build visible rows
-        visible = wrapped[self._scroll_offset:self._scroll_offset + display_height]
+        visible = wrapped[self._scroll_offset : self._scroll_offset + display_height]
         output: list[str] = []
 
         for row_in_view, (row_idx, offset, text) in enumerate(visible):
@@ -182,7 +182,7 @@ class EditorWidget(Component):
                 col_in_segment = self._cursor_col - offset
                 if 0 <= col_in_segment <= len(text) and absolute_row == cursor_display:
                     before = text[:col_in_segment]
-                    after = text[col_in_segment + 1:] if col_in_segment < len(text) else ""
+                    after = text[col_in_segment + 1 :] if col_in_segment < len(text) else ""
                     cursor_ch = text[col_in_segment] if col_in_segment < len(text) else " "
                     cursor_display_ch = style(cursor_ch, bold=True, underline=True)
                     output.append(f"{before}{cursor_display_ch}{after}")
@@ -212,8 +212,8 @@ class EditorWidget(Component):
         # Newline: Enter
         if name == "enter":
             line = self._lines[self._cursor_row]
-            before = line[:self._cursor_col]
-            after = line[self._cursor_col:]
+            before = line[: self._cursor_col]
+            after = line[self._cursor_col :]
             self._lines[self._cursor_row] = before
             self._lines.insert(self._cursor_row + 1, after)
             self._cursor_row += 1
@@ -226,7 +226,7 @@ class EditorWidget(Component):
             if self._cursor_col > 0:
                 line = self._lines[self._cursor_row]
                 self._lines[self._cursor_row] = (
-                    line[:self._cursor_col - 1] + line[self._cursor_col:]
+                    line[: self._cursor_col - 1] + line[self._cursor_col :]
                 )
                 self._cursor_col -= 1
             elif self._cursor_row > 0:
@@ -244,7 +244,7 @@ class EditorWidget(Component):
             line = self._lines[self._cursor_row]
             if self._cursor_col < len(line):
                 self._lines[self._cursor_row] = (
-                    line[:self._cursor_col] + line[self._cursor_col + 1:]
+                    line[: self._cursor_col] + line[self._cursor_col + 1 :]
                 )
             elif self._cursor_row < len(self._lines) - 1:
                 # Merge with next line
@@ -321,7 +321,7 @@ class EditorWidget(Component):
             indent = "    "
             line = self._lines[self._cursor_row]
             self._lines[self._cursor_row] = (
-                line[:self._cursor_col] + indent + line[self._cursor_col:]
+                line[: self._cursor_col] + indent + line[self._cursor_col :]
             )
             self._cursor_col += len(indent)
             self.invalidate()
@@ -331,7 +331,7 @@ class EditorWidget(Component):
         if key.char and key.char.isprintable() and not key.ctrl and not key.alt:
             line = self._lines[self._cursor_row]
             self._lines[self._cursor_row] = (
-                line[:self._cursor_col] + key.char + line[self._cursor_col:]
+                line[: self._cursor_col] + key.char + line[self._cursor_col :]
             )
             self._cursor_col += 1
             self.invalidate()

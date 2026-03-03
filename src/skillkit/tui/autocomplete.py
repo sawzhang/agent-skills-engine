@@ -18,6 +18,7 @@ from pathlib import Path
 # Suggestion model
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Suggestion:
     """
@@ -46,6 +47,7 @@ class Suggestion:
 # ---------------------------------------------------------------------------
 # Abstract provider
 # ---------------------------------------------------------------------------
+
 
 class AutocompleteProvider(ABC):
     """
@@ -77,6 +79,7 @@ class AutocompleteProvider(ABC):
 # File autocomplete  (triggered by @<path>)
 # ---------------------------------------------------------------------------
 
+
 class FileAutocomplete(AutocompleteProvider):
     """
     Suggest file paths when the user types an ``@`` prefix.
@@ -105,7 +108,7 @@ class FileAutocomplete(AutocompleteProvider):
 
         query = prefix[1:]  # strip the leading '@'
         files = self._list_files(query)
-        return files[:self._max_results]
+        return files[: self._max_results]
 
     # ------------------------------------------------------------------
     # File listing
@@ -153,17 +156,21 @@ class FileAutocomplete(AutocompleteProvider):
                 continue
 
             name = Path(path_str).name
-            suggestions.append(Suggestion(
-                text=f"@{path_str}",
-                display=path_str,
-                description=name,
-            ))
+            suggestions.append(
+                Suggestion(
+                    text=f"@{path_str}",
+                    display=path_str,
+                    description=name,
+                )
+            )
 
         # Sort by relevance: paths starting with the query first, then alphabetical
-        suggestions.sort(key=lambda s: (
-            not s.display.lower().startswith(query_lower),
-            s.display.lower(),
-        ))
+        suggestions.sort(
+            key=lambda s: (
+                not s.display.lower().startswith(query_lower),
+                s.display.lower(),
+            )
+        )
         return suggestions
 
     def _walk_files(self, query: str) -> list[Suggestion]:
@@ -183,23 +190,26 @@ class FileAutocomplete(AutocompleteProvider):
                 rel_path = str(rel_dir / fname) if str(rel_dir) != "." else fname
                 if query_lower and query_lower not in rel_path.lower():
                     continue
-                suggestions.append(Suggestion(
-                    text=f"@{rel_path}",
-                    display=rel_path,
-                    description=fname,
-                ))
+                suggestions.append(
+                    Suggestion(
+                        text=f"@{rel_path}",
+                        display=rel_path,
+                        description=fname,
+                    )
+                )
                 if len(suggestions) >= self._max_results * 2:
                     break
             if len(suggestions) >= self._max_results * 2:
                 break
 
         suggestions.sort(key=lambda s: s.display.lower())
-        return suggestions[:self._max_results]
+        return suggestions[: self._max_results]
 
 
 # ---------------------------------------------------------------------------
 # Command autocomplete  (triggered by /<command>)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SlashCommand:
@@ -241,11 +251,13 @@ class CommandAutocomplete(AutocompleteProvider):
         for cmd in self._commands:
             if query and not cmd.name.lower().startswith(query):
                 continue
-            results.append(Suggestion(
-                text=f"/{cmd.name}",
-                display=f"/{cmd.name}",
-                description=cmd.description,
-            ))
+            results.append(
+                Suggestion(
+                    text=f"/{cmd.name}",
+                    display=f"/{cmd.name}",
+                    description=cmd.description,
+                )
+            )
 
         results.sort(key=lambda s: s.text.lower())
         return results
@@ -254,6 +266,7 @@ class CommandAutocomplete(AutocompleteProvider):
 # ---------------------------------------------------------------------------
 # Combined autocomplete
 # ---------------------------------------------------------------------------
+
 
 class CombinedAutocomplete(AutocompleteProvider):
     """
@@ -304,11 +317,11 @@ class CombinedAutocomplete(AutocompleteProvider):
             all_suggestions: list[Suggestion] = []
             for provider in self._providers:
                 all_suggestions.extend(provider.get_suggestions(prefix))
-            return all_suggestions[:self._max_results]
+            return all_suggestions[: self._max_results]
 
         for provider in self._providers:
             results = provider.get_suggestions(prefix)
             if results:
-                return results[:self._max_results]
+                return results[: self._max_results]
 
         return []

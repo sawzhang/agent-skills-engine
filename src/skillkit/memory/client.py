@@ -33,8 +33,7 @@ class OpenVikingClient:
             import httpx
         except ImportError:
             logger.warning(
-                "httpx is required for memory integration. "
-                "Install with: pip install httpx"
+                "httpx is required for memory integration. Install with: pip install httpx"
             )
             return False
 

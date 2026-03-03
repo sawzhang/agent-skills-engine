@@ -1,4 +1,5 @@
 """Package data models."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -56,9 +57,7 @@ class PackageManifest:
     @property
     def is_empty(self) -> bool:
         """Check if the manifest has no resources."""
-        return not (
-            self.extensions or self.skills or self.themes or self.prompts
-        )
+        return not (self.extensions or self.skills or self.themes or self.prompts)
 
 
 @dataclass

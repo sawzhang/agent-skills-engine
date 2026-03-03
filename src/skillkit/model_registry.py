@@ -198,9 +198,7 @@ class ModelRegistry:
         """Find models whose ID or display_name contains the query (case-insensitive)."""
         q = query.lower()
         return [
-            m
-            for m in self._models.values()
-            if q in m.id.lower() or q in m.display_name.lower()
+            m for m in self._models.values() if q in m.id.lower() or q in m.display_name.lower()
         ]
 
     def list_by_provider(self, provider: str) -> list[ModelDefinition]:

@@ -1,4 +1,5 @@
 """SQLite-backed session and settings storage for the web UI."""
+
 from __future__ import annotations
 
 import json
@@ -82,8 +83,7 @@ class SessionStorage:
                 "SELECT id, title, created_at, updated_at FROM sessions ORDER BY updated_at DESC"
             ).fetchall()
             return [
-                {"id": r[0], "title": r[1], "created_at": r[2], "updated_at": r[3]}
-                for r in rows
+                {"id": r[0], "title": r[1], "created_at": r[2], "updated_at": r[3]} for r in rows
             ]
 
     def delete_session(self, session_id: str) -> bool:

@@ -1,4 +1,5 @@
 """Package manager for resolving and loading packages."""
+
 from __future__ import annotations
 
 import glob as glob_module
@@ -35,12 +36,8 @@ class PackageManager:
         user_dir: Path | None = None,
         project_dir: Path | None = None,
     ) -> None:
-        self._user_dir = user_dir or (
-            Path.home() / ".skillkit" / "packages"
-        )
-        self._project_dir = project_dir or (
-            Path.cwd() / ".skillkit" / "packages"
-        )
+        self._user_dir = user_dir or (Path.home() / ".skillkit" / "packages")
+        self._project_dir = project_dir or (Path.cwd() / ".skillkit" / "packages")
         self._packages: list[ResolvedPackage] = []
 
     @property
@@ -124,16 +121,24 @@ class PackageManager:
             base_dir=path,
             manifest=manifest,
             extensions=self._resolve_globs(
-                path, manifest.extensions, metadata,
+                path,
+                manifest.extensions,
+                metadata,
             ),
             skills=self._resolve_globs(
-                path, manifest.skills, metadata,
+                path,
+                manifest.skills,
+                metadata,
             ),
             themes=self._resolve_globs(
-                path, manifest.themes, metadata,
+                path,
+                manifest.themes,
+                metadata,
             ),
             prompts=self._resolve_globs(
-                path, manifest.prompts, metadata,
+                path,
+                manifest.prompts,
+                metadata,
             ),
         )
 
@@ -167,12 +172,8 @@ class PackageManager:
             base_dir=str(base_dir),
         )
 
-        project_name = (
-            data.get("project", {}).get("name", base_dir.name)
-        )
-        project_version = (
-            data.get("project", {}).get("version", "")
-        )
+        project_name = data.get("project", {}).get("name", base_dir.name)
+        project_version = data.get("project", {}).get("version", "")
 
         return ResolvedPackage(
             name=project_name,
@@ -181,16 +182,24 @@ class PackageManager:
             base_dir=base_dir,
             manifest=manifest,
             extensions=self._resolve_globs(
-                base_dir, manifest.extensions, metadata,
+                base_dir,
+                manifest.extensions,
+                metadata,
             ),
             skills=self._resolve_globs(
-                base_dir, manifest.skills, metadata,
+                base_dir,
+                manifest.skills,
+                metadata,
             ),
             themes=self._resolve_globs(
-                base_dir, manifest.themes, metadata,
+                base_dir,
+                manifest.themes,
+                metadata,
             ),
             prompts=self._resolve_globs(
-                base_dir, manifest.prompts, metadata,
+                base_dir,
+                manifest.prompts,
+                metadata,
             ),
         )
 
@@ -214,7 +223,8 @@ class PackageManager:
                     seen.add(match_path)
                     resources.append(
                         ResolvedResource(
-                            path=match_path, metadata=metadata,
+                            path=match_path,
+                            metadata=metadata,
                         ),
                     )
 
@@ -233,9 +243,7 @@ class PackageManager:
             try:
                 with open(pyproject, "rb") as f:
                     data = tomllib.load(f)
-                sk_config = (
-                    data.get("tool", {}).get("skillkit", {})
-                )
+                sk_config = data.get("tool", {}).get("skillkit", {})
                 if sk_config:
                     return PackageManifest.from_dict(sk_config)
             except Exception:

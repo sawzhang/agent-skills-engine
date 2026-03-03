@@ -92,7 +92,7 @@ class TUIRenderer:
             new_lines = new_lines[:height]
 
         # Decide between full and differential redraw
-        size_changed = (width != self._prev_width or height != self._prev_height)
+        size_changed = width != self._prev_width or height != self._prev_height
         if size_changed or not self._previous_lines:
             self._full_render(new_lines, width, height)
         else:

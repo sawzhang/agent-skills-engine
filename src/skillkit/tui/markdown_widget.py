@@ -20,16 +20,18 @@ from skillkit.tui.keys import Key
 # Default code-block theme overrides (keep it minimal)
 # ---------------------------------------------------------------------------
 
-_RICH_THEME = RichTheme({
-    "markdown.h1": "bold bright_white",
-    "markdown.h2": "bold bright_cyan",
-    "markdown.h3": "bold cyan",
-    "markdown.h4": "bold dim cyan",
-    "markdown.link": "bright_blue underline",
-    "markdown.link_url": "dim blue",
-    "markdown.code": "bright_green on grey11",
-    "markdown.item.bullet": "bright_yellow",
-})
+_RICH_THEME = RichTheme(
+    {
+        "markdown.h1": "bold bright_white",
+        "markdown.h2": "bold bright_cyan",
+        "markdown.h3": "bold cyan",
+        "markdown.h4": "bold dim cyan",
+        "markdown.link": "bright_blue underline",
+        "markdown.link_url": "dim blue",
+        "markdown.code": "bright_green on grey11",
+        "markdown.item.bullet": "bright_yellow",
+    }
+)
 
 
 class MarkdownWidget(Component):

@@ -21,6 +21,7 @@ RESET = f"{CSI}0m"
 # Standard foreground colors (30-37, 90-97)
 # ---------------------------------------------------------------------------
 
+
 class FG:
     """Standard ANSI foreground colors."""
 
@@ -46,6 +47,7 @@ class FG:
 # Standard background colors (40-47, 100-107)
 # ---------------------------------------------------------------------------
 
+
 class BG:
     """Standard ANSI background colors."""
 
@@ -70,6 +72,7 @@ class BG:
 # ---------------------------------------------------------------------------
 # True-color (24-bit) helpers
 # ---------------------------------------------------------------------------
+
 
 def rgb_fg(r: int, g: int, b: int) -> str:
     """Return an escape sequence for a 24-bit foreground color."""
@@ -187,6 +190,7 @@ def style(
 # Cursor movement
 # ---------------------------------------------------------------------------
 
+
 def cursor_up(n: int = 1) -> str:
     """Move cursor up by *n* rows."""
     return f"{CSI}{n}A"
@@ -226,6 +230,7 @@ def cursor_restore() -> str:
 # Screen / line clearing
 # ---------------------------------------------------------------------------
 
+
 def clear_line() -> str:
     """Erase the entire current line."""
     return f"{CSI}2K"
@@ -245,6 +250,7 @@ def clear_to_end() -> str:
 # Cursor visibility
 # ---------------------------------------------------------------------------
 
+
 def hide_cursor() -> str:
     """Hide the terminal cursor."""
     return f"{CSI}?25l"
@@ -258,6 +264,7 @@ def show_cursor() -> str:
 # ---------------------------------------------------------------------------
 # Terminal title
 # ---------------------------------------------------------------------------
+
 
 def set_title(title: str) -> str:
     """Set the terminal window title via OSC 2."""

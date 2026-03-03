@@ -100,9 +100,7 @@ class SessionManager:
                 break
 
         if found_path is None:
-            raise FileNotFoundError(
-                f"No session with id {session_id!r} in {self._session_dir}"
-            )
+            raise FileNotFoundError(f"No session with id {session_id!r} in {self._session_dir}")
 
         header, entries = load_session(found_path)
         assert header is not None  # guaranteed by the search above

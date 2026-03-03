@@ -1,4 +1,5 @@
 """Ls tool - list directory contents."""
+
 from __future__ import annotations
 
 import os
@@ -36,8 +37,7 @@ class LsTool(BaseTool):
                 "path": {
                     "type": "string",
                     "description": (
-                        "Directory path to list. "
-                        "Defaults to current working directory."
+                        "Directory path to list. Defaults to current working directory."
                     ),
                 },
                 "recursive": {
@@ -48,8 +48,7 @@ class LsTool(BaseTool):
                 "long_format": {
                     "type": "boolean",
                     "description": (
-                        "Show detailed information (permissions, size, date). "
-                        "Defaults to false."
+                        "Show detailed information (permissions, size, date). Defaults to false."
                     ),
                     "default": False,
                 },
@@ -84,7 +83,10 @@ class LsTool(BaseTool):
         return self._list_directory(target, long_format, include_hidden)
 
     def _list_directory(
-        self, directory: Path, long_format: bool, include_hidden: bool,
+        self,
+        directory: Path,
+        long_format: bool,
+        include_hidden: bool,
     ) -> str:
         """List a single directory's contents."""
         try:
@@ -111,11 +113,18 @@ class LsTool(BaseTool):
         return "\n".join(lines)
 
     def _list_recursive(
-        self, directory: Path, long_format: bool, include_hidden: bool,
+        self,
+        directory: Path,
+        long_format: bool,
+        include_hidden: bool,
     ) -> str:
         """List directory contents recursively."""
         skip_dirs = {
-            ".git", "node_modules", "__pycache__", ".venv", "venv",
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
         }
 
         lines: list[str] = []
@@ -127,8 +136,7 @@ class LsTool(BaseTool):
 
             # Skip ignored directories
             dirs[:] = sorted(
-                d for d in dirs
-                if d not in skip_dirs and (include_hidden or not d.startswith("."))
+                d for d in dirs if d not in skip_dirs and (include_hidden or not d.startswith("."))
             )
 
             # Filter hidden files
@@ -158,8 +166,7 @@ class LsTool(BaseTool):
                 count += 1
                 if count > max_entries:
                     lines.append(
-                        f"\n... (stopped after {max_entries} entries, "
-                        f"use a more specific path)"
+                        f"\n... (stopped after {max_entries} entries, use a more specific path)"
                     )
                     return "\n".join(lines)
 
@@ -211,14 +218,30 @@ class LsTool(BaseTool):
     def _format_permissions(mode: int) -> str:
         """Format file permissions as rwxrwxrwx string."""
         perms = ""
-        for who in (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR,
-                     stat.S_IRGRP, stat.S_IWGRP, stat.S_IXGRP,
-                     stat.S_IROTH, stat.S_IWOTH, stat.S_IXOTH):
+        for who in (
+            stat.S_IRUSR,
+            stat.S_IWUSR,
+            stat.S_IXUSR,
+            stat.S_IRGRP,
+            stat.S_IWGRP,
+            stat.S_IXGRP,
+            stat.S_IROTH,
+            stat.S_IWOTH,
+            stat.S_IXOTH,
+        ):
             if mode & who:
                 # Determine which character based on position
-                idx = (stat.S_IRUSR, stat.S_IWUSR, stat.S_IXUSR,
-                       stat.S_IRGRP, stat.S_IWGRP, stat.S_IXGRP,
-                       stat.S_IROTH, stat.S_IWOTH, stat.S_IXOTH).index(who)
+                idx = (
+                    stat.S_IRUSR,
+                    stat.S_IWUSR,
+                    stat.S_IXUSR,
+                    stat.S_IRGRP,
+                    stat.S_IWGRP,
+                    stat.S_IXGRP,
+                    stat.S_IROTH,
+                    stat.S_IWOTH,
+                    stat.S_IXOTH,
+                ).index(who)
                 chars = "rwxrwxrwx"
                 perms += chars[idx]
             else:

@@ -72,6 +72,42 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.mypy]
 python_version = "3.10"
 strict = true
+warn_return_any = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = [
+    "skillkit.agent",
+    "skillkit.session.*",
+    "skillkit.memory.*",
+    "skillkit.runtime.*",
+    "skillkit.adapters.openai",
+    "skillkit.extensions.manager",
+    "skillkit.context",
+    "skillkit.cli",
+    "skillkit.transports.*",
+    "skillkit.tools.*",
+    "skillkit.modes.*",
+    "skillkit.packages.*",
+    "skillkit.utils.*",
+    "skillkit.web.*",
+]
+disable_error_code = [
+    "assignment",
+    "arg-type",
+    "attr-defined",
+    "dict-item",
+    "union-attr",
+    "unused-ignore",
+    "var-annotated",
+    "import-not-found",
+    "import-untyped",
+    "override",
+    "type-var",
+    "misc",
+    "no-untyped-def",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

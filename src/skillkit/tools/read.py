@@ -1,4 +1,5 @@
 """Read tool - read file contents with optional line range."""
+
 from __future__ import annotations
 
 import base64
@@ -13,7 +14,16 @@ logger = get_logger("tools.read")
 
 # Image extensions that should be returned as base64
 _IMAGE_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".ico", ".tiff", ".tif",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".svg",
+    ".ico",
+    ".tiff",
+    ".tif",
 }
 
 # Maximum number of lines to read by default
@@ -49,16 +59,12 @@ class ReadTool(BaseTool):
                 },
                 "offset": {
                     "type": "integer",
-                    "description": (
-                        "Line number to start reading from (1-based). "
-                        "Defaults to 1."
-                    ),
+                    "description": ("Line number to start reading from (1-based). Defaults to 1."),
                 },
                 "limit": {
                     "type": "integer",
                     "description": (
-                        "Maximum number of lines to read. "
-                        f"Defaults to {_DEFAULT_LIMIT}."
+                        f"Maximum number of lines to read. Defaults to {_DEFAULT_LIMIT}."
                     ),
                 },
             },
