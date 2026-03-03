@@ -131,6 +131,12 @@ try:
 except ImportError:
     pass
 
+# Optional: Sandbox module (requires BoxLite)
+try:
+    from skillkit.sandbox import SandboxedAgentRunner
+except ImportError:
+    pass
+
 # Optional: memory module
 try:
     from skillkit.memory import MemoryConfig, OpenVikingClient, setup_memory
@@ -238,6 +244,7 @@ __all__ = [
     "CodeModeRuntime",
     "BoxLiteRuntime",
     "SecurityLevel",
+    "SandboxedAgentRunner",
     # Adapters
     "AdapterRegistry",
     "AdapterFactory",

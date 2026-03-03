@@ -606,3 +606,184 @@ class TestBoxLiteRuntimeCommandBuilding:
         runtime = BoxLiteRuntime()
         cmd = runtime._build_command("echo $V", env={"V": "it's"})
         assert "it'\\''s" in cmd
+
+
+# ---------------------------------------------------------------------------
+# Volumes / working_dir / box_env
+# ---------------------------------------------------------------------------
+
+
+class TestBoxLiteRuntimeVolumes:
+    def test_volumes_passed_to_box_options(self) -> None:
+        vols = [("/host/dir", "/guest/dir", "rw")]
+        runtime = BoxLiteRuntime(volumes=vols)
+        with patch.object(_mock_boxlite, "BoxOptions") as mock_opts:
+            runtime._resolve_box_options()
+            call_kwargs = mock_opts.call_args[1]
+            assert call_kwargs["volumes"] == vols
+
+    def test_working_dir_passed_to_box_options(self) -> None:
+        runtime = BoxLiteRuntime(working_dir="/workspace")
+        with patch.object(_mock_boxlite, "BoxOptions") as mock_opts:
+            runtime._resolve_box_options()
+            call_kwargs = mock_opts.call_args[1]
+            assert call_kwargs["working_dir"] == "/workspace"
+
+    def test_box_env_passed_to_box_options(self) -> None:
+        env = [("MY_VAR", "value")]
+        runtime = BoxLiteRuntime(box_env=env)
+        with patch.object(_mock_boxlite, "BoxOptions") as mock_opts:
+            runtime._resolve_box_options()
+            call_kwargs = mock_opts.call_args[1]
+            assert call_kwargs["env"] == env
+
+    def test_none_values_omitted_from_box_options(self) -> None:
+        runtime = BoxLiteRuntime()
+        with patch.object(_mock_boxlite, "BoxOptions") as mock_opts:
+            runtime._resolve_box_options()
+            call_kwargs = mock_opts.call_args[1]
+            assert "volumes" not in call_kwargs
+            assert "working_dir" not in call_kwargs
+            assert "env" not in call_kwargs
+
+    def test_volumes_with_dev_security(self) -> None:
+        vols = [("/data", "/mnt/data", "ro")]
+        runtime = BoxLiteRuntime(security_level=SecurityLevel.DEV, volumes=vols)
+        with patch.object(_mock_boxlite, "BoxOptions") as mock_opts:
+            runtime._resolve_box_options()
+            call_kwargs = mock_opts.call_args[1]
+            assert call_kwargs["volumes"] == vols
+            assert call_kwargs["cpus"] >= 2
+
+    def test_volumes_with_maximum_security(self) -> None:
+        vols = [("/data", "/mnt/data", "ro")]
+        runtime = BoxLiteRuntime(security_level=SecurityLevel.MAXIMUM, volumes=vols)
+        with patch.object(_mock_boxlite, "BoxOptions") as mock_opts:
+            runtime._resolve_box_options()
+            call_kwargs = mock_opts.call_args[1]
+            assert call_kwargs["volumes"] == vols
+            assert call_kwargs["cpus"] == 1
+            assert call_kwargs["memory_mib"] == 256
+
+
+# ---------------------------------------------------------------------------
+# File I/O methods
+# ---------------------------------------------------------------------------
+
+
+class TestBoxLiteRuntimeFileIO:
+    @pytest.mark.asyncio
+    async def test_read_file(self, runtime: BoxLiteRuntime, mock_box: AsyncMock) -> None:
+        exec_result = _make_exec_result(stdout="file contents\n")
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        content = await runtime.read_file("/workspace/test.txt")
+        assert content == "file contents\n"
+        mock_box.exec.assert_called_once_with("cat", "/workspace/test.txt")
+
+    @pytest.mark.asyncio
+    async def test_read_file_not_found(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        exec_result = _make_exec_result(stderr="No such file", exit_code=1)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        with pytest.raises(FileNotFoundError, match="No such file"):
+            await runtime.read_file("/nonexistent")
+
+    @pytest.mark.asyncio
+    async def test_write_file(self, runtime: BoxLiteRuntime, mock_box: AsyncMock) -> None:
+        exec_result = _make_exec_result()
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        await runtime.write_file("/workspace/out.txt", "hello")
+        mock_box.exec.assert_called_once()
+        call_args = mock_box.exec.call_args
+        assert call_args[0][0] == "bash"
+        assert "/workspace/out.txt" in call_args[0][2]
+
+    @pytest.mark.asyncio
+    async def test_write_file_failure(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        exec_result = _make_exec_result(stderr="Permission denied", exit_code=1)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        with pytest.raises(OSError, match="Permission denied"):
+            await runtime.write_file("/readonly/file.txt", "data")
+
+    @pytest.mark.asyncio
+    async def test_file_exists_true(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        exec_result = _make_exec_result(exit_code=0)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        assert await runtime.file_exists("/workspace/test.txt") is True
+        mock_box.exec.assert_called_once_with("test", "-e", "/workspace/test.txt")
+
+    @pytest.mark.asyncio
+    async def test_file_exists_false(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        exec_result = _make_exec_result(exit_code=1)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        assert await runtime.file_exists("/nonexistent") is False
+
+    @pytest.mark.asyncio
+    async def test_list_dir(self, runtime: BoxLiteRuntime, mock_box: AsyncMock) -> None:
+        ls_output = "total 4\n-rw-r--r-- 1 root root 5 file.txt\n"
+        exec_result = _make_exec_result(stdout=ls_output)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        result = await runtime.list_dir("/workspace")
+        assert "file.txt" in result
+        mock_box.exec.assert_called_once_with("ls", "-la", "/workspace")
+
+    @pytest.mark.asyncio
+    async def test_list_dir_not_found(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        exec_result = _make_exec_result(stderr="No such directory", exit_code=2)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        with pytest.raises(FileNotFoundError, match="No such directory"):
+            await runtime.list_dir("/nonexistent")
+
+
+# ---------------------------------------------------------------------------
+# is_ready
+# ---------------------------------------------------------------------------
+
+
+class TestBoxLiteRuntimeIsReady:
+    @pytest.mark.asyncio
+    async def test_is_ready_true(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        exec_result = _make_exec_result(stdout="ready\n", exit_code=0)
+        execution = _make_execution(exec_result)
+        mock_box.exec = AsyncMock(return_value=execution)
+
+        assert await runtime.is_ready() is True
+
+    @pytest.mark.asyncio
+    async def test_is_ready_no_box(self) -> None:
+        runtime = BoxLiteRuntime()
+        assert await runtime.is_ready() is False
+
+    @pytest.mark.asyncio
+    async def test_is_ready_exec_fails(
+        self, runtime: BoxLiteRuntime, mock_box: AsyncMock
+    ) -> None:
+        mock_box.exec = AsyncMock(side_effect=RuntimeError("connection lost"))
+        assert await runtime.is_ready() is False

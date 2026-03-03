@@ -54,6 +54,9 @@ class BoxLiteRuntime(SkillRuntime):
         default_timeout: float = 30.0,
         max_output_size: int = 1_000_000,
         auto_destroy: bool = True,
+        volumes: list[tuple[str, str, str]] | None = None,
+        working_dir: str | None = None,
+        box_env: list[tuple[str, str]] | None = None,
     ) -> None:
         self.security_level = security_level
         self.image = image
@@ -62,6 +65,9 @@ class BoxLiteRuntime(SkillRuntime):
         self.default_timeout = default_timeout
         self.max_output_size = max_output_size
         self.auto_destroy = auto_destroy
+        self.volumes = volumes
+        self.working_dir = working_dir
+        self.box_env = box_env
 
         self._boxlite_runtime: boxlite.Boxlite | None = None
         self._box: boxlite.Box | None = None
@@ -87,26 +93,32 @@ class BoxLiteRuntime(SkillRuntime):
 
     def _resolve_box_options(self) -> boxlite.BoxOptions:
         """Map security level to BoxOptions."""
+        # Common kwargs shared across all security levels
+        common: dict[str, object] = {"image": self.image, "auto_remove": False}
+        if self.volumes is not None:
+            common["volumes"] = self.volumes
+        if self.working_dir is not None:
+            common["working_dir"] = self.working_dir
+        if self.box_env is not None:
+            common["env"] = self.box_env
+
         if self.security_level == SecurityLevel.DEV:
             return boxlite.BoxOptions(
-                image=self.image,
                 cpus=max(self.cpus, 2),
                 memory_mib=max(self.memory_mib, 1024),
-                auto_remove=False,
+                **common,
             )
         elif self.security_level == SecurityLevel.MAXIMUM:
             return boxlite.BoxOptions(
-                image=self.image,
                 cpus=1,
                 memory_mib=256,
-                auto_remove=False,
+                **common,
             )
         else:  # STANDARD
             return boxlite.BoxOptions(
-                image=self.image,
                 cpus=self.cpus,
                 memory_mib=self.memory_mib,
-                auto_remove=False,
+                **common,
             )
 
     # ------------------------------------------------------------------
@@ -337,6 +349,60 @@ class BoxLiteRuntime(SkillRuntime):
         if len(text) > self.max_output_size:
             return text[: self.max_output_size] + "\n... (output truncated)"
         return text
+
+    # ------------------------------------------------------------------
+    # File I/O (BoxLite-specific, not part of SkillRuntime ABC)
+    # ------------------------------------------------------------------
+
+    async def read_file(self, path: str) -> str:
+        """Read a file from inside the sandbox."""
+        box = await self._ensure_box()
+        execution = await box.exec("cat", path)
+        result = await execution.wait()
+        if result.exit_code != 0:
+            raise FileNotFoundError(
+                result.stderr or f"Failed to read {path} (exit {result.exit_code})"
+            )
+        return result.stdout or ""
+
+    async def write_file(self, path: str, content: str) -> None:
+        """Write a file inside the sandbox."""
+        box = await self._ensure_box()
+        escaped = content.replace("'", "'\\''")
+        cmd = f"mkdir -p $(dirname {path}) && printf '%s' '{escaped}' > {path}"
+        execution = await box.exec("bash", "-c", cmd)
+        result = await execution.wait()
+        if result.exit_code != 0:
+            raise OSError(result.stderr or f"Failed to write {path} (exit {result.exit_code})")
+
+    async def file_exists(self, path: str) -> bool:
+        """Check if a file exists inside the sandbox."""
+        box = await self._ensure_box()
+        execution = await box.exec("test", "-e", path)
+        result = await execution.wait()
+        return result.exit_code == 0
+
+    async def list_dir(self, path: str) -> str:
+        """List directory contents inside the sandbox."""
+        box = await self._ensure_box()
+        execution = await box.exec("ls", "-la", path)
+        result = await execution.wait()
+        if result.exit_code != 0:
+            raise FileNotFoundError(
+                result.stderr or f"Failed to list {path} (exit {result.exit_code})"
+            )
+        return result.stdout or ""
+
+    async def is_ready(self) -> bool:
+        """Check if the sandbox is ready to accept commands."""
+        if self._box is None:
+            return False
+        try:
+            execution = await self._box.exec("echo", "ready")
+            result = await execution.wait()
+            return result.exit_code == 0
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     # Lifecycle management
