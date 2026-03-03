@@ -35,6 +35,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.18"]
+websockets = ["websockets>=12.0"]
+memory = ["httpx>=0.24"]
+web = ["starlette>=0.27", "uvicorn>=0.23"]
+
+[dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -42,11 +49,6 @@ dev = [
     "mypy>=1.8",
     "types-PyYAML>=6.0",
 ]
-openai = ["openai>=1.0"]
-anthropic = ["anthropic>=0.18"]
-websockets = ["websockets>=12.0"]
-memory = ["httpx>=0.24"]
-web = ["starlette>=0.27", "uvicorn>=0.23"]
 
 [project.urls]
 Homepage = "https://github.com/alexzhang2015/skillkit"

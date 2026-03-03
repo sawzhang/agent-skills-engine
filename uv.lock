@@ -1494,13 +1494,6 @@ dependencies = [
 anthropic = [
     { name = "anthropic" },
 ]
-dev = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
 memory = [
     { name = "httpx" },
 ]
@@ -1515,32 +1508,45 @@ websockets = [
     { name = "websockets" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.18" },
     { name = "httpx", marker = "extra == 'memory'", specifier = ">=0.24" },
     { name = "markitdown", extras = ["pptx"], specifier = ">=0.1.4" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
     { name = "openai", specifier = ">=2.16.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
     { name = "partial-json-parser", specifier = ">=0.1" },
     { name = "pillow", specifier = ">=12.1.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pypdf", specifier = ">=6.6.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "reportlab", specifier = ">=4.4.9" },
     { name = "rich", specifier = ">=13.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "starlette", marker = "extra == 'web'", specifier = ">=0.27" },
-    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.23" },
     { name = "watchfiles", specifier = ">=0.21" },
     { name = "websockets", marker = "extra == 'websockets'", specifier = ">=12.0" },
 ]
-provides-extras = ["dev", "openai", "anthropic", "websockets", "memory", "web"]
+provides-extras = ["openai", "anthropic", "websockets", "memory", "web"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.8" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23" },
+    { name = "ruff", specifier = ">=0.1" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
+]
 
 [[package]]
 name = "sniffio"
