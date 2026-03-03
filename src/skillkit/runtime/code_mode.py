@@ -31,6 +31,7 @@ import textwrap
 from typing import Any
 
 from skillkit.runtime.base import ExecutionResult, OutputCallback, SkillRuntime
+from skillkit.runtime.subprocess_streaming import collect_subprocess_streaming
 
 # Sentinel for "result not set by user code"
 _UNSET = object()
@@ -624,128 +625,16 @@ if result is not _UNSET:
         on_output: OutputCallback | None,
         abort_signal: asyncio.Event | None,
     ) -> ExecutionResult:
-        """Streaming path: read output line by line with abort support."""
-        stdout_lines: list[str] = []
-        stderr_lines: list[str] = []
-        aborted = False
-        abort_task: asyncio.Task[None] | None = None
-
-        async def _read_stream(
-            stream: asyncio.StreamReader | None,
-            lines: list[str],
-            callback: OutputCallback | None,
-        ) -> None:
-            if stream is None:
-                return
-            while True:
-                line = await stream.readline()
-                if not line:
-                    break
-                decoded = line.decode("utf-8", errors="replace")
-                lines.append(decoded)
-                if callback:
-                    callback(decoded)
-
-        async def _watch_abort() -> None:
-            nonlocal aborted
-            if abort_signal is None:
-                return
-            await abort_signal.wait()
-            aborted = True
-            try:
-                process.kill()
-            except ProcessLookupError:
-                pass
-
-        try:
-            if abort_signal is not None and abort_signal.is_set():
-                aborted = True
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
-                await process.wait()
-                return ExecutionResult.error_result(
-                    error="Aborted",
-                    exit_code=-2,
-                    duration_ms=timer.elapsed_ms(),
-                )
-
-            # Start stdout/stderr readers; abort watcher runs independently so it
-            # cannot keep the wait() call pending until timeout.
-            reader_tasks = [
-                asyncio.create_task(_read_stream(process.stdout, stdout_lines, on_output)),
-                asyncio.create_task(_read_stream(process.stderr, stderr_lines, None)),
-            ]
-            if abort_signal is not None:
-                abort_task = asyncio.create_task(_watch_abort())
-
-            _, pending = await asyncio.wait(reader_tasks, timeout=timeout)
-
-            readers_done = len(pending) == 0
-
-            for t in pending:
-                t.cancel()
-                try:
-                    await t
-                except (asyncio.CancelledError, Exception):
-                    pass
-
-            if not readers_done and not aborted:
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
-                await process.wait()
-                return ExecutionResult.error_result(
-                    error=f"Code timed out after {timeout}s",
-                    exit_code=-1,
-                    output=self._truncate("".join(stdout_lines)),
-                    duration_ms=timer.elapsed_ms(),
-                )
-
-            await process.wait()
-
-            if aborted:
-                return ExecutionResult.error_result(
-                    error="Aborted",
-                    exit_code=-2,
-                    output=self._truncate("".join(stdout_lines)),
-                    duration_ms=timer.elapsed_ms(),
-                )
-
-            output = self._truncate("".join(stdout_lines))
-            error_output = "".join(stderr_lines)
-
-            if process.returncode == 0:
-                return ExecutionResult.success_result(
-                    output=output,
-                    duration_ms=timer.elapsed_ms(),
-                )
-            else:
-                return ExecutionResult.error_result(
-                    error=error_output or f"Code failed with exit code {process.returncode}",
-                    exit_code=process.returncode or 1,
-                    output=output,
-                    duration_ms=timer.elapsed_ms(),
-                )
-
-        except Exception as e:
-            try:
-                process.kill()
-            except ProcessLookupError:
-                pass
-            return ExecutionResult.error_result(
-                error=str(e),
-                exit_code=-1,
-                duration_ms=timer.elapsed_ms(),
-            )
-        finally:
-            if abort_task is not None:
-                if not abort_task.done():
-                    abort_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await abort_task
+        """Streaming path: collect subprocess output with shared runtime helper."""
+        return await collect_subprocess_streaming(
+            process=process,
+            timer=timer,
+            timeout=timeout,
+            on_output=on_output,
+            abort_signal=abort_signal,
+            label="Code",
+            truncate=self._truncate,
+        )
 
     # ------------------------------------------------------------------
     # Helpers
