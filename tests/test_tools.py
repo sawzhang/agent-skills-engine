@@ -316,6 +316,13 @@ class TestApplyPatchTool:
         assert tool.name == "apply_patch"
         assert "top-level fields" in tool.description.lower()
         assert "diff is required" in tool.description.lower()
+        assert "inserts content at the top of the file" in tool.description.lower()
+        assert "include context using ' ' or '-'" in tool.description.lower()
+        assert "original='b\\nc\\n'" in tool.description
+        assert "result='a\\nb\\nc\\n'" in tool.description
+        assert "original='line1\\nline2\\n'" in tool.description
+        assert "result='line1\\nline two\\n'" in tool.description
+        assert "\"type\":\"update_file\"" in tool.description
 
     def test_parameters_schema_is_strict_and_conditional(self) -> None:
         tool = ApplyPatchTool()

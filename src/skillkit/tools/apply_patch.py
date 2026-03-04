@@ -36,7 +36,16 @@ class ApplyPatchTool(BaseTool):
             "Apply one file change per call using top-level fields: type, path, diff. "
             "type must be create_file, update_file, or delete_file. "
             "diff is required for create_file and update_file. "
-            "Diff prefixes: '+' add line, '-' remove line, ' ' unchanged context line."
+            "Diff prefixes: '+' add line, '-' remove line, ' ' unchanged context line. "
+            "For update_file, a diff with only '+' lines inserts content at the top of the file; "
+            "to update existing content, include context using ' ' or '-' lines. "
+            "Example (top insert): original='b\\nc\\n', "
+            "call={\"type\":\"update_file\",\"path\":\"notes.txt\",\"diff\":\"+a\"}, "
+            "result='a\\nb\\nc\\n'. "
+            "Example (targeted update): original='line1\\nline2\\n', "
+            "call={\"type\":\"update_file\",\"path\":\"notes.txt\","
+            "\"diff\":\" line1\\n-line2\\n+line two\"}, "
+            "result='line1\\nline two\\n'."
         )
 
     @property
