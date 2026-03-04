@@ -314,9 +314,8 @@ class TestApplyPatchTool:
     def test_name_and_description(self) -> None:
         tool = ApplyPatchTool()
         assert tool.name == "apply_patch"
-        assert "patch" in tool.description.lower()
-        assert "start of the file" in tool.description.lower()
-        assert "specific location" in tool.description.lower()
+        assert "top-level fields" in tool.description.lower()
+        assert "diff is required" in tool.description.lower()
 
     def test_parameters_schema_is_strict_and_conditional(self) -> None:
         tool = ApplyPatchTool()

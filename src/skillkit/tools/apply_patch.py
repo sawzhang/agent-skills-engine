@@ -33,12 +33,10 @@ class ApplyPatchTool(BaseTool):
     @property
     def description(self) -> str:
         return (
-            "Apply one file patch operation with top-level fields: type, path, diff. "
-            "For create_file and update_file, diff is required and uses prefixes "
-            "(+ add, - remove, space for context). "
-            "For update_file, diff with only + lines inserts at the start of the file; "
-            "to insert at a specific location, include unchanged context lines prefixed "
-            "with a space. For create_file, all diff lines must start with +."
+            "Apply one file change per call using top-level fields: type, path, diff. "
+            "type must be create_file, update_file, or delete_file. "
+            "diff is required for create_file and update_file. "
+            "Diff prefixes: '+' add line, '-' remove line, ' ' unchanged context line."
         )
 
     @property
