@@ -67,6 +67,7 @@ from skillkit.models import (
     TextContent,
 )
 from skillkit.tools.apply_patch import ApplyPatchTool
+from skillkit.tools.edit import EditTool
 
 # Auto-load .env file from current directory or parent directories
 load_dotenv(override=True)
@@ -525,6 +526,7 @@ class AgentRunner:
         if not self.config.enable_tools:
             return []
 
+        edit_definition = EditTool().definition()
         apply_patch_definition = ApplyPatchTool().definition()
 
         tools = [
@@ -618,6 +620,14 @@ class AgentRunner:
                         },
                         "required": ["path"],
                     },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": edit_definition.name,
+                    "description": edit_definition.description,
+                    "parameters": edit_definition.parameters,
                 },
             },
             {
@@ -1020,6 +1030,12 @@ class AgentRunner:
                 return text
             except Exception as e:
                 return f"Error reading file: {e}"
+
+        if name == "edit":
+            workspace_root = getattr(self, "default_cwd", None)
+            tool_cwd = str(workspace_root) if workspace_root else os.getcwd()
+            tool = EditTool(cwd=tool_cwd)
+            return await tool.execute(args)
 
         if name == "apply_patch":
             workspace_root = getattr(self, "default_cwd", None)

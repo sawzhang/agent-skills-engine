@@ -26,8 +26,9 @@ class TestGetToolsIncludesExtensionTools:
         names = [t["function"]["name"] for t in tools]
         assert "execute" in names
         assert "execute_script" in names
+        assert "edit" in names
         assert "apply_patch" in names
-        assert len(tools) == 5  # execute, execute_script, write, read, apply_patch
+        assert len(tools) == 6  # execute, execute_script, write, read, edit, apply_patch
 
     def test_with_extension_tools(self, runner):
         runner.engine.extensions = ExtensionManager(runner.engine)
@@ -43,8 +44,9 @@ class TestGetToolsIncludesExtensionTools:
         names = [t["function"]["name"] for t in tools]
         assert "execute" in names
         assert "execute_script" in names
+        assert "edit" in names
         assert "my_custom_tool" in names
-        assert len(tools) == 6  # 5 builtin + 1 extension
+        assert len(tools) == 7  # 6 builtin + 1 extension
 
     def test_extension_tool_schema(self, runner):
         runner.engine.extensions = ExtensionManager(runner.engine)
@@ -176,4 +178,24 @@ class TestExecuteToolDispatchesExtensionTools:
         })
 
         assert "Updated" in result
+        assert target.read_text(encoding="utf-8") == "hello skillkit\n"
+
+    @pytest.mark.asyncio
+    async def test_edit_tool_dispatch(self, runner, tmp_path):
+        target = tmp_path / "demo.txt"
+        target.write_text("hello world\n", encoding="utf-8")
+
+        result = await runner._execute_tool({
+            "name": "edit",
+            "arguments": json.dumps(
+                {
+                    "file_path": str(target),
+                    "old_string": "world",
+                    "new_string": "skillkit",
+                }
+            ),
+            "id": "call_7",
+        })
+
+        assert "Edited" in result
         assert target.read_text(encoding="utf-8") == "hello skillkit\n"
